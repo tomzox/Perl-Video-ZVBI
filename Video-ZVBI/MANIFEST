@@ -1,0 +1,10 @@
+COPYING
+MANIFEST
+Makefile.PL
+test.pl
+typemap
+ZVBI.pm
+ZVBI.xs
+examples/export.pl
+examples/network.pl
+examples/proxy-test.pl

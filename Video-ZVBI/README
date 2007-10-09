@@ -1,25 +1,40 @@
-# ZVBI library interface module
+ZVBI library interface module
+-----------------------------
 
-This repository contains the sources of the Perl "Video-ZVBI" module, which has its
-official home at [https://metacpan.org/pod/Video::ZVBI](https://metacpan.org/pod/Video::ZVBI).
-Please use the ticket interfaces at CPAN for reporting issues.
+Name:           Video::Capture::ZVBI
+Version:        0.2.0
+Date:           October 2007
 
-This Perl extension module provides an object-oriented interface to the ZVBI
-library. The ZVBI library allows to access broadcast data services such as
-teletext or closed captions via analog or DVB video capture devices.
+DLSIP-code:     bcdOg
+                - development stage: beta testing
+                - C compiler required for installation
+                - support by developer
+                - object oriented using blessed references
+                - licensed under GPL (GNU General Public License)
+
+Supported OS:   Linux, FreeBSD, NetBSD, OpenBSD
+Author:         TOMZO (Tom Zoerner <tomzo AT nefkom DOT net>)
+URL:            http://www.perl.com/CPAN/authors/Tom_Zoerner/
+
+
+Description
+-----------
+
+This module provides a Perl interface to the ZVBI library.  The ZVBI
+library allows to access broadcast data services such as teletext or
+closed captions via analog or DVB video capture devices.
 
 Official ZVBI library description:
 
-> The ZVBI library provides routines to access raw VBI sampling devices
-> (currently the Linux V4L and and V4L2 API and the FreeBSD, OpenBSD,
-> NetBSD and BSDi bktr driver API are supported), a versatile raw VBI
-> bit slicer, decoders for various data services and basic search, render
-> and export functions for text pages. The library was written for the
-> Zapping TV viewer and Zapzilla Teletext browser.
+"The ZVBI library provides routines to access raw VBI sampling devices
+(currently the Linux V4L and and V4L2 API and the FreeBSD, OpenBSD,
+NetBSD and BSDi bktr driver API are supported), a versatile raw VBI
+bit slicer, decoders for various data services and basic search, render
+and export functions for text pages. The library was written for the
+Zapping TV viewer and Zapzilla Teletext browser."
 
 The ZVBI Perl module supports almost all exported libzvbi functions
-(see <A HREF="Video-ZVBI/ZVBI.pm">manual page</A>),
-however some work still needs to be done for DVB,
+(see manual page), however some work still needs to be done for DVB,
 callback user parameters, export options and page search.
 
 The Perl interface is based on blessed references to binary pointers.
@@ -30,29 +45,14 @@ the structures are copied into Perl data types.  This approach allows
 for a pretty snappy performace.
 
 Best starting point to get familiar with the module is to have a look
-at the [ZVBI library documentation](http://zapping.sourceforge.net/doc/libzvbi/index.html)
-and the examples scripts provided in the <A HREF="Video-ZVBI/example/">example/</A>
-subdirectory: these are more or less direct C to Perl ports of the respective programs
-in the `test/` subdirectory of the libzvbi source tree.
+at <http://zapping.sourceforge.net/doc/libzvbi/index.html> and the
+examples scripts provided in the example/ subdirectory: these are
+more or less direct C to Perl ports of the respective programs in
+the test/ subdirectory of the libzvbi sources.
 
-## Module information
 
-Perl DLSIP-code: bcdOg
-
-* development stage: beta testing
-* C compiler required for installation
-* support by developer
-* object oriented using blessed references
-* licensed under GPL (GNU General Public License)
-
-Supported operating systems (as determined by ZVBI library):
-
-* Linux
-* FreeBSD
-* NetBSD
-* OpenBSD
-
-## Comparison with Video-Capture-VBI
+Comparison with Video-Capture-VBI
+---------------------------------
 
 You may have noticed that there already is a Perl VBI module which
 provides very similar functionality.  The reason that a separate
@@ -76,22 +76,24 @@ less elegant than just creating an interface to libzvbi.
 Other benefits are that libzvbi has good documentation and is
 optimized for performance (i.e. the ZVBI Perl module is about
 10 times faster than the VBI module.)  The only downside is
-Nextview EPG, which is supported in VBI, but not in libzvbi.
+Nextview EPG, which is supported in VBI, but not in linzvbi.
 
-## Installation
 
-Pre-requisite to the installation is the [libzvbi library](http://zapping.sourceforge.net/doc/libzvbi/index.html)
-(you need a development package which includes the `libzvbi.h` header file)
+Installation
+------------
+
+Pre-requisite to the installation is the libzvbi library (you need
+a development package which includes the libzvbi.h header file)
 and a C compiler.  If you have these already, installation is done
 in the usual steps:
 
-```console
-    perl Makefile.PL
-    make
-    make install
-```
+perl Makefile.PL
+make
+make install
 
-## Copyright
+
+Copyright
+---------
 
 Copyright (C) 2006-2007 Th. "Tom" Zoerner. All rights reserved.
 
@@ -107,3 +109,4 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+

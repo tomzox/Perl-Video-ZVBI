@@ -1,0 +1,124 @@
+#
+# Copyright (C) 2006 Tom Zoerner. All rights reserved.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# For a copy of the GPL refer to <http://www.gnu.org/licenses/>
+#
+# $Id$
+#
+
+TYPEMAP
+
+# basic C types
+vbi_bool		T_BOOL
+vbi_pgno		T_IV
+vbi_subno		T_IV
+vbi_nuid		T_UV
+vbi_page_type		T_ENUM
+vbi_pixfmt		T_IV
+const char *		T_PV
+int64_t                 T_IV
+VBI_CHN_PRIO		T_IV
+VBI_CAPTURE_FD_FLAGS	T_IV
+
+# objects
+# (for some reason the INPUT/OUTPUT definitions are not found if the type name has more than 2 chars)
+VbiProxyObj *		PO
+VbiCaptureObj *		PO
+VbiVtObj *		PO
+VbiRawDecObj *		PO
+VbiExportObj *		PO
+VbiSearchObj *		PO
+VbiPageObj *		PO
+
+# plain pointer
+VbiRawBuffer *		T_PTROBJ
+VbiSlicedBuffer *	T_PTROBJ
+
+VbiBufVar		T_SV
+
+#############################################################################
+INPUT
+
+PV
+        if (SvOK($arg)) {
+            $var = $arg;
+        }
+        else
+            Perl_croak(aTHX_ \"$var is not a scalar\")
+
+PO
+        if (sv_derived_from($arg, \"${(my $ntt=$ntype)=~s/Vbi(.*)Obj.*/Video::Capture::ZVBI::\L$1/;\$ntt}\")) {
+            IV tmp = SvIV((SV*)SvRV($arg));
+            $var = INT2PTR($type,tmp);
+        }
+        else
+            Perl_croak(aTHX_ \"$var is not of type ${ntype}\")
+
+# blessed array reference
+PB
+	if (sv_derived_from($arg, \"${ntype}\")) {
+	    if (SvROK($arg) && SvTYPE(SvRV($arg))==SVt_PVAV) {
+	        $var = (AV*)SvRV($arg);
+            }
+            else
+                Perl_croak(aTHX_ \"$var is not of type ${ntype}\")
+        }
+        else
+            Perl_croak(aTHX_ \"$var is not of type ${ntype}\")
+
+# unused: object ref stored in a hash wrapper
+XYZ
+	if (sv_derived_from($arg, \"$Package\")) {
+	    HE * obj_ent = hv_fetch_ent((HV*)($arg), sv_cref_str, 0, 0);
+	    if (obj_ent != NULL) {
+	        if (SvROK($arg)) {
+	            IV tmp = SvIV((SV*)SvRV($arg));
+	            $var = INT2PTR($type,tmp);
+	        }
+	        else
+	            Perl_croak(aTHX_ \"cref entry is not a reference\");
+	    }
+	    else
+	        Perl_croak(aTHX_ \"$var is not a valid object of ${ntype}\");
+	}
+	else
+	    Perl_croak(aTHX_ \"$var is not of type ${Package}\");
+
+#############################################################################
+OUTPUT
+
+PV
+        $arg = $var;
+
+PO
+        sv_setref_pv($arg, \"${(my $ntt=$ntype)=~s/Vbi(.*)(Obj|Ref).*/Video::Capture::ZVBI::\L$1/;\$ntt}\", (void*)$var);
+
+# blessed array reference
+PB
+
+XYZ
+	{
+	HV *stash;
+	HV *hv;
+	SV *sv;
+	
+	sv = newSV(0);
+	sv_setref_pv(sv, Nullch, (void*)$var);
+	
+	hv = newHV();
+	hv_store(hv, "cref", 0, sv, 0);
+	sv_setsv($arg, newRV_noinc((SV*)hv));
+	
+	stash = gv_stashpvn(\"$Package\", 1, TRUE);
+	sv_bless($arg, stash);
+	}
