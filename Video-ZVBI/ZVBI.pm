@@ -59,45 +59,96 @@ in B<errorstr>.
 
 =over 4
 
-=item v4l2_new
-(dev, buffers, services, strict, errorstr, trace)
+=item $cap = v4l2_new($dev, $buffers, $services, $strict, $errorstr, $trace)
 
-Initializes a device using the Video4Linux API version 2.
+Initializes a device using the Video4Linux API version 2.  The function
+returns a blessed reference to a capture context, or C<undef> upon error.
 
-=item v4l_new
-(dev, scanning, services, strict, errorstr, trace)
+Parameters: I<$dev> is the path of the device to open, usually one of
+C</dev/vbi0> or up. I<$buffers> is the number of device buffers for
+raw vbi data if the driver supports streaming. Otherwise one bounce
+buffer is allocated for I<$cap->pull()>  I<$services> is a logical OR
+of C<VBI_SLICED_*> symbols describing the data services to be decoded.
+On return the services actually decodable will be stored here.
+See I<ZVBI::raw_dec::add_services> for details.  If you want to capture
+raw data only, set to C<VBI_SLICED_VBI_525>, C<VBI_SLICED_VBI_625> or
+both.  If this parameter is C<undef>, no services will be installed.
+You can do so later with I<$cap->update_services()> (Note the I<reset>
+parameter to that function must be logically true in this case.)
+I<$strict> Will be passed to I<ZVBI::raw_dec::add_services>.
+I<$errorstr> is used to return an error descriptions.  I<$trace> can be
+used to enable output of progress messages on I<stderr>.
+
+=item $cap = v4l_new($dev, $scanning, $services, $strict, $errorstr, $trace)
 
 Initializes a device using the Video4Linux API version 1. Should only
-be used after trying Video4Linux API version 2.
+be used after trying Video4Linux API version 2.  The function returns
+a blessed reference to a capture context, or C<undef> upon error.
 
-=item v4l_sidecar_new
-(dev, given_fd, services, strict, errorstr, trace)
+Parameters: I<$dev> is the path of the device to open, usually one of
+C</dev/vbi0> or up. I<$scanning> can be used to specify the current
+TV norm for old drivers which don't support ioctls to query the current
+norm.  Allowed values are: 625 for PAL/SECAM family; 525 for NTSC family;
+0 if unknown or if you don't care about obsolete drivers. I<$services>,
+I<$strict>, I<$errorstr>, I<$trace>: see function I<v4l2_new()> above.
+
+=item $cap = v4l_sidecar_new($dev, $given_fd, $services, $strict, $errorstr, $trace)
 
 Same as B<v4l_new> however working on an already open device.
 Parameter B<given_fd> must be the numerical file handle, i.e. as
 returned by B<fileno>.
 
-=item bktr_new
-(dev, scanning, services, strict, errorstr, trace)
+=item $cap = bktr_new($dev, $scanning, $services, $strict, $errorstr, $trace)
 
 Initializes a video device using the BSD driver.
+Result and parameters are identical to function I<v4l2_new()>
 
-=item dvb_new
-(dev, scanning, services, strict, errorstr, trace)
+=item $cap = dvb_new($dev, $scanning, $services, $strict, $errorstr, $trace)
 
-Initializes a DVB video device.
+Initializes a DVB video device.  This function is deprecated as it has many
+bugs (see libzvbi documentation for details). Use dvb_new2() instead.
 
-=item dvb_new2
-(dev, pid, errorstr, trace)
+=item dvb_new2($dev, $pid, $errorstr, $trace)
 
-Initializes a DVB video device.
+Initializes a DVB video device.  The function returns a blessed reference
+to a capture context, or C<undef> upon error.
 
-=item proxy_new
-(vpc, buffers, scanning, services, strict, errorstr)
+Parameters: I<$dev> is the path of the DVB device to open.
+I<$pid> specifies the number (PID) of a stream which contains the data.
+You can pass 0 here and set or change the PID later with I<$cap->dvb_filter()>.
+I<$errorstr> is used to return an error descriptions.  I<$trace> can be
+used to enable output of progress messages on I<stderr>.
 
-Creates a capture context based on a previously established connection
-to a VBI proxy server. It's good practice to always try first if a
-proxy connection can be established before opening the device directly.
+=item $cap = $proxy->proxy_new($buffers, $scanning, $services, $strict, $errorstr)
+
+Open a new connection to a VBI proxy to open a VBI device for the
+given services.  On side of the proxy one of the regular v4l_new() etc.
+functions is invoked and if it succeeds, data slicing is started
+and all captured data forwarded transparently.
+
+Whenever possible the proxy should be used instead of opening the device
+directly, since it allows the user to start multiple VBI clients in
+parallel.  When this function fails (usually because the user hasn't
+started the proxy daemon) applications should automatically fall back
+to opening the device directly.
+
+Result: The function returns a blessed reference to a capture context,
+or C<undef> upon error.
+
+Parameters: I<$proxy> is a reference to a previously created proxy client
+context.  I<$buffers> is the number of device buffers for raw vbi data.
+The same number of buffers is allocated to cache sliced data in the
+proxy daemon.  I<$scanning> indicates the current norm: 625 for PAL and
+525 for NTSC; set to 0 if you don't know (you should not attempt
+to query the device for the norm, as this parameter is only required
+for old v4l1 drivers which don't support video standard query ioctls.)
+I<$services> is a set of C<VBI_SLICED_*> symbols describing the data
+services to be decoded. On return I<$services> contains actually
+decodable services.  See I<ZVBI::raw_dec::add_services> for details.
+If you want to capture raw data only, set to C<VBI_SLICED_VBI_525>,
+C<VBI_SLICED_VBI_625> or both.  I<$strict> has the same meaning as
+described in the device-soecific capture context creation functions.
+I<$errorstr> is used to return an error descriptions.
 
 =back
 
@@ -172,21 +223,80 @@ VBI source.  This hash can be used to initialize the raw decoder
 context described below.  (You should not modify the parameters,
 use B<update_services> instead.)
 
+=item $cap->update_services($reset, $commit, $services, $strict, $errorstr)
+
+Adds and/or removes one or more services to an already initialized capture
+context.  Can be used to dynamically change the set of active services.
+Internally the function will restart parameter negotiation with the
+VBI device driver and then call I<ZVBI::raw_dec::add_services>
+You may set I<$reset> to rebuild your service mask from scratch.  Note
+that the number of VBI lines may change with this call (even if a negative
+result is returned) so the size of output buffers may change.
+
+Result: Bitmask of supported services among those requested (not including
+previously added services), 0 upon errors.
+
+I<$reset> when set, clears all previous services before adding new
+ones (by invoking $raw_dec->reset() at the appropriate time.)
+I<$commit> when set, applies all previously added services to the device;
+when doing subsequent calls of this function, commit should be set only
+for the last call.  Reading data cannot continue before changes were
+commited (because capturing has to be suspended to allow resizing the
+VBI image.)  Note this flag is ignored when using the VBI proxy.
+I<$services> contains a set of C<VBI_SLICED_*> symbols describing the
+data services to be decoded. On return the services actually decodable
+will be stored here, i.e. the behaviour is identical to v4l2_new() etc.
+I<$strict> and I<$errorstr> are also same as during capture context
+creation.
+
 =item $cap->fd()
 
-=item $cap->update_services(reset, commit, services, strict, errorstr)
+This function returns the file descriptor used to read from the
+capture context's device. If not applicable (e.g. when using the proxy)
+or the capture context is invalid -1 will be returned.
 
 =item $cap->get_scanning()
 
+This function is intended to allow the application to check for
+asynchronous norm changes, i.e. by a different application using the
+same device.  The function queries the capture device for the current
+norm and returns value 625 for PAL/SECAM norms, 525 for NTSC;
+0 if unknown, -1 on error.
+
 =item $cap->flush()
 
-=item $cap->set_video_path(dev_video)
+After a channel change this function should be used to discard all
+VBI data in intermediate buffers which may still originate from the
+previous TV channel.
+
+=item $cap->set_video_path($dev)
+
+The function sets the path to the video device for TV norm queries.
+Parameter $<dev> must refer to the same hardware as the VBI device
+which is used for capturing (e.g. C</dev/video0> when capturing from
+C</dev/vbi0>) Note: only useful for old video4linux drivers which don't
+support norm queries through VBI devices.
 
 =item $cap->get_fd_flags()
 
-=item $cap->vbi_capture_dvb_filter(pid)
+Returns properties of the capture context's device. The result is an OR
+of one or more C<VBI_FD_*> flags.
+
+=item $cap->vbi_capture_dvb_filter($pid)
+
+Programs the DVB device transport stream demultiplexer to filter
+out PES packets with the given I<$pid>.  Returns -1 on failure,
+0 on success.
 
 =item $cap->vbi_capture_dvb_last_pts()
+
+Returns the presentation time stamp (33 bits) associated with the data
+last read from the context. The PTS refers to the first sliced
+VBI line, not the last packet containing data of that frame.
+
+Note timestamps returned by VBI capture read functions contain
+the sampling time of the data, that is the time at which the
+packet containing the first sliced line arrived.
 
 =back
 
@@ -194,28 +304,43 @@ use B<update_services> instead.)
 
 =over 4
 
-=item create(dev_name, client_name, flags, errorstr, trace)
+=item $proxy = create($dev, $client_name, $flags, $errorstr, $trace)
 
-Returns a new proxy context, or undef. Note this call will always
-succeed, since a connection to the proxy daemon isn't established
-until you try to open a capture context.
+Creates and returns a new proxy context, or C<undef> upon error.
+(Note in reality this call will always succeed, since a connection to
+the proxy daemon isn't established until you actually open a capture
+context via I<$proxy->proxy_new()>)
+
+Parameters: I<$dev> contains the name of the device to open, usually one of
+C</dev/vbi0> and up.  Note: should be the same path as used by the proxy
+daemon, else the client may not be able to connect.  I<$client_name>
+names the client application, typically identical to I<$0> (without the
+path though)  Can be used by the proxy daemon to fine-tune scheduling or
+to present the user with a list of currently connected applications.
+I<$flags> can contain one or more members of C<VBI_PROXY_CLIENT_*> flags.
+I<$errorstr> is used to return an error descriptions.  I<$trace> can be
+used to enable output of progress messages on I<stderr>.
 
 =item $proxy->get_capture_if()
 
-This function is currently not supported.
+This function is not supported.  (In libzvbi it returns a reference to
+a capture context created from the proxy context via I<$proxy->proxy_new()>)
 
-=item $proxy->set_callback(callback)
+=item $proxy->set_callback(\&callback, $data)
 
-Installs a callback function for asynchronous messages (e.g. channel
-change notifications.)  The callback function is typically invoked
+Installs or removes a callback function for asynchronous messages (e.g.
+channel change notifications.)  The callback function is typically invoked
 while processing a read from the capture device. The function will
-receive the event mask as only argument.  Call without an argument
-to remove the callback again.
+receive the event mask (i.e. one of symbols C<VBI_PROXY_EV_*>) as only
+argument.  Call without an argument to remove the callback again.
+Optional argument I<$data> is currently ignored (in libzvbi it is
+passed through to the callback.)
 
 =item $proxy->get_driver_api()
 
-Returns an identifier describing which API is used on server side.
-This information is required to pass channel change requests.
+Returns an identifier describing which API is used on server side,
+i.e. one of the symbols C<VBI_API_*>.  This information is required to
+pass channel change requests to the proxy daemon.
 
 =item $proxy->channel_request(chn_prio [,profile])
 

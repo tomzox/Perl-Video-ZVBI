@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006 Tom Zoerner. All rights reserved.
+# Copyright (C) 2006-2007 Tom Zoerner. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -39,6 +39,7 @@ VbiRawDecObj *		PO
 VbiExportObj *		PO
 VbiSearchObj *		PO
 VbiPageObj *		PO
+VbiDvbDemuxObj *	PO
 
 # plain pointer
 VbiRawBuffer *		T_PTROBJ
@@ -64,36 +65,6 @@ PO
         else
             Perl_croak(aTHX_ \"$var is not of type ${ntype}\")
 
-# blessed array reference
-PB
-	if (sv_derived_from($arg, \"${ntype}\")) {
-	    if (SvROK($arg) && SvTYPE(SvRV($arg))==SVt_PVAV) {
-	        $var = (AV*)SvRV($arg);
-            }
-            else
-                Perl_croak(aTHX_ \"$var is not of type ${ntype}\")
-        }
-        else
-            Perl_croak(aTHX_ \"$var is not of type ${ntype}\")
-
-# unused: object ref stored in a hash wrapper
-XYZ
-	if (sv_derived_from($arg, \"$Package\")) {
-	    HE * obj_ent = hv_fetch_ent((HV*)($arg), sv_cref_str, 0, 0);
-	    if (obj_ent != NULL) {
-	        if (SvROK($arg)) {
-	            IV tmp = SvIV((SV*)SvRV($arg));
-	            $var = INT2PTR($type,tmp);
-	        }
-	        else
-	            Perl_croak(aTHX_ \"cref entry is not a reference\");
-	    }
-	    else
-	        Perl_croak(aTHX_ \"$var is not a valid object of ${ntype}\");
-	}
-	else
-	    Perl_croak(aTHX_ \"$var is not of type ${Package}\");
-
 #############################################################################
 OUTPUT
 
@@ -103,22 +74,3 @@ PV
 PO
         sv_setref_pv($arg, \"${(my $ntt=$ntype)=~s/Vbi(.*)(Obj|Ref).*/Video::Capture::ZVBI::\L$1/;\$ntt}\", (void*)$var);
 
-# blessed array reference
-PB
-
-XYZ
-	{
-	HV *stash;
-	HV *hv;
-	SV *sv;
-	
-	sv = newSV(0);
-	sv_setref_pv(sv, Nullch, (void*)$var);
-	
-	hv = newHV();
-	hv_store(hv, "cref", 0, sv, 0);
-	sv_setsv($arg, newRV_noinc((SV*)hv));
-	
-	stash = gv_stashpvn(\"$Package\", 1, TRUE);
-	sv_bless($arg, stash);
-	}
