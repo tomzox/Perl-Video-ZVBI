@@ -5,6 +5,10 @@ test.pl
 typemap
 ZVBI.pm
 ZVBI.xs
+examples/browse-ttx.pl
+examples/explist.pl
 examples/export.pl
 examples/network.pl
 examples/proxy-test.pl
+examples/test-vps.pl
+examples/search-ttx.pl

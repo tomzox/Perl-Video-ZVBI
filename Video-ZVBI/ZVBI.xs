@@ -30,7 +30,6 @@ typedef vbi_capture VbiCaptureObj;
 typedef vbi_capture_buffer VbiRawBuffer;
 typedef vbi_capture_buffer VbiSlicedBuffer;
 typedef vbi_raw_decoder VbiRawDecObj;
-typedef SV * VbiBufVar;
 
 typedef vbi_decoder VbiVtObj;
 typedef vbi_export VbiExportObj;
@@ -172,7 +171,7 @@ static void zvbi_xs_prog_info_to_hv( HV * hv, vbi_program_info * p_pi )
                 for (idx = 0; (idx < 33) && (p_pi->type_id[idx] != 0); idx++) {
                         av_push(av, newSViv(p_pi->type_id[idx]));
                 }
-                hv_store_rv(hv, type_classf, (SV*)av);
+                hv_store_rv(hv, type_id, (SV*)av);
         }
         if (p_pi->rating_auth != VBI_RATING_AUTH_NONE) {
                 hv_store_iv(hv, rating_auth, p_pi->rating_auth);
@@ -259,15 +258,77 @@ static void zvbi_xs_event_to_hv( HV * hv, vbi_event * ev )
         }
 }
 
-static HV * zvbi_xs_export_info_to_hv( vbi_export_info * info )
+static HV * zvbi_xs_export_info_to_hv( vbi_export_info * p_info )
 {
         HV * hv = newHV();
 
-        hv_store_pv(hv, keyword, info->keyword);
-        hv_store_pv(hv, label, info->label);
-        hv_store_pv(hv, tooltip, info->tooltip);
-        hv_store_pv(hv, mime_type, info->mime_type);
-        hv_store_pv(hv, extension, info->extension);
+        hv_store_pv(hv, keyword, p_info->keyword);
+        hv_store_pv(hv, label, p_info->label);
+        hv_store_pv(hv, tooltip, p_info->tooltip);
+        hv_store_pv(hv, mime_type, p_info->mime_type);
+        hv_store_pv(hv, extension, p_info->extension);
+
+        return hv;
+}
+
+static HV * zvbi_xs_export_option_info_to_hv( vbi_option_info * p_opt )
+{
+        HV * hv = newHV();
+
+        hv_store_iv(hv, type, p_opt->type);
+
+        if (p_opt->keyword != NULL) {
+                hv_store_pv(hv, keyword, p_opt->keyword);
+        }
+        if (p_opt->label != NULL) {
+                hv_store_pv(hv, label, p_opt->label);
+        }
+        if (p_opt->tooltip != NULL) {
+                hv_store_pv(hv, tooltip, p_opt->tooltip);
+        }
+
+        switch (p_opt->type) {
+        case VBI_OPTION_BOOL:
+        case VBI_OPTION_INT:
+        case VBI_OPTION_MENU:
+                hv_store_iv(hv, def, p_opt->def.num);
+                hv_store_iv(hv, min, p_opt->min.num);
+                hv_store_iv(hv, max, p_opt->max.num);
+                hv_store_iv(hv, step, p_opt->step.num);
+                if (p_opt->menu.num != NULL) {
+                        hv_store_iv(hv, menu, *p_opt->menu.num);
+                }
+                break;
+        case VBI_OPTION_REAL:
+                hv_store_nv(hv, def, p_opt->def.dbl);
+                hv_store_nv(hv, min, p_opt->min.dbl);
+                hv_store_nv(hv, max, p_opt->max.dbl);
+                hv_store_nv(hv, step, p_opt->step.dbl);
+                if (p_opt->menu.dbl != NULL) {
+                        hv_store_nv(hv, menu, *p_opt->menu.dbl);
+                }
+                break;
+        case VBI_OPTION_STRING:
+                if (p_opt->def.str != NULL) {
+                        hv_store_pv(hv, def, p_opt->def.str);
+                }
+                if (p_opt->min.str != NULL) {
+                        hv_store_pv(hv, min, p_opt->min.str);
+                }
+                if (p_opt->max.str != NULL) {
+                        hv_store_pv(hv, max, p_opt->max.str);
+                }
+                if (p_opt->step.str != NULL) {
+                        hv_store_pv(hv, step, p_opt->step.str);
+                }
+                if ((p_opt->menu.str != NULL) && (*p_opt->menu.str != NULL)) {
+                        hv_store_pv(hv, menu, *p_opt->menu.str);
+                }
+                break;
+        default:
+                /* error - the caller can detect this case by evaluating the type */
+                break;
+        }
 
         return hv;
 }
@@ -369,6 +430,27 @@ static void * zvbi_xs_sv_buffer_prep( SV * sv_buf, STRLEN buf_size )
         return SvPV_force(sv_buf, l);
 }
 
+static void * zvbi_xs_sv_canvas_prep( SV * sv_buf, STRLEN buf_size, vbi_bool blank )
+{
+        char * p_str;
+        STRLEN l;
+
+        if (!SvPOK(sv_buf))  {
+                sv_setpv(sv_buf, "");
+        }
+        p_str = SvPV_force(sv_buf, l);
+        if (l < buf_size) {
+                SvGROW(sv_buf, buf_size + 1);
+                SvCUR_set(sv_buf, buf_size);
+                p_str = SvPV_force(sv_buf, l);
+
+                memset(p_str, 0, buf_size);
+        } else if (blank) {
+                memset(p_str, 0, buf_size);
+        }
+        return p_str;
+}
+
 MODULE = Video::Capture::ZVBI	PACKAGE = Video::Capture::ZVBI::proxy	PREFIX = vbi_proxy_client_
 
 PROTOTYPES: ENABLE
@@ -448,13 +530,14 @@ vbi_proxy_client_channel_request(vpc, chn_prio, profile=NULL)
                 if (NULL != (p_sv = hv_fetch_pv(profile, exp_duration))) {
                         l_profile.exp_duration = SvIV (*p_sv);
                 }
+                l_profile.is_valid = 1;
         }
         RETVAL = vbi_proxy_client_channel_request(vpc, chn_prio, &l_profile);
         OUTPUT:
         RETVAL
 
 int
-vbi_proxy_client_channel_notify(vpc, notify_flags, scanning)
+vbi_proxy_client_channel_notify(vpc, notify_flags, scanning=0)
         VbiProxyObj * vpc
         int notify_flags
         int scanning
@@ -628,23 +711,23 @@ vbi_capture_DESTROY(cap)
         vbi_capture_delete(cap);
 
 int
-vbi_capture_read_raw(capture, raw_buffer, timestamp, msecs)
+vbi_capture_read_raw(capture, raw_buffer, timestamp, timeout_ms)
         VbiCaptureObj * capture
-        VbiBufVar raw_buffer
+        SV * raw_buffer
         double &timestamp = NO_INIT
-        int msecs
+        int timeout_ms
         PREINIT:
-        struct timeval timeout;
+        struct timeval tv;
         vbi_raw_decoder * p_par;
         char * p;
         CODE:
-        timeout.tv_sec  = msecs / 1000;
-        timeout.tv_usec = (msecs % 1000) * 1000;
+        tv.tv_sec  = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
         p_par = vbi_capture_parameters(capture);
         if (p_par != NULL) {
                 size_t size = (p_par->count[0] + p_par->count[1]) * p_par->bytes_per_line;
                 p = zvbi_xs_sv_buffer_prep(raw_buffer, size);
-                RETVAL = vbi_capture_read_raw(capture, p, &timestamp, &timeout);
+                RETVAL = vbi_capture_read_raw(capture, p, &timestamp, &tv);
         } else {
                 RETVAL = -1;
         }
@@ -654,78 +737,78 @@ vbi_capture_read_raw(capture, raw_buffer, timestamp, msecs)
         RETVAL
 
 int
-vbi_capture_read_sliced(capture, data, lines, timestamp, msecs)
+vbi_capture_read_sliced(capture, data, n_lines, timestamp, timeout_ms)
         VbiCaptureObj * capture
         SV * data
-        int &lines = NO_INIT
+        int &n_lines = NO_INIT
         double &timestamp = NO_INIT
-        int msecs
+        int timeout_ms
         PREINIT:
-        struct timeval timeout;
+        struct timeval tv;
         vbi_raw_decoder * p_par;
         vbi_sliced * p_sliced;
         CODE:
-        timeout.tv_sec  = msecs / 1000;
-        timeout.tv_usec = (msecs % 1000) * 1000;
+        tv.tv_sec  = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
         p_par = vbi_capture_parameters(capture);
         if (p_par != NULL) {
                 size_t size = (p_par->count[0] + p_par->count[1]) * sizeof(vbi_sliced);
                 p_sliced = zvbi_xs_sv_buffer_prep(data, size);
-                RETVAL = vbi_capture_read_sliced(capture, p_sliced, &lines, &timestamp, &timeout);
+                RETVAL = vbi_capture_read_sliced(capture, p_sliced, &n_lines, &timestamp, &tv);
         } else {
                 RETVAL = -1;
         }
         OUTPUT:
         data
-        lines
+        n_lines
         timestamp
         RETVAL
 
 int
-vbi_capture_read(capture, raw_data, sliced_data, lines, timestamp, msecs)
+vbi_capture_read(capture, raw_data, sliced_data, n_lines, timestamp, timeout_ms)
         VbiCaptureObj * capture
         SV * raw_data
         SV * sliced_data
-        int &lines = NO_INIT
+        int &n_lines = NO_INIT
         double &timestamp = NO_INIT
-        int msecs
+        int timeout_ms
         PREINIT:
-        struct timeval timeout;
+        struct timeval tv;
         vbi_raw_decoder * p_par;
         char * p_raw;
         vbi_sliced * p_sliced;
         CODE:
-        timeout.tv_sec  = msecs / 1000;
-        timeout.tv_usec = (msecs % 1000) * 1000;
+        tv.tv_sec  = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
         p_par = vbi_capture_parameters(capture);
         if (p_par != NULL) {
                 size_t size_raw = (p_par->count[0] + p_par->count[1]) * sizeof(vbi_sliced);
                 size_t size_sliced = (p_par->count[0] + p_par->count[1]) * p_par->bytes_per_line;
                 p_raw = zvbi_xs_sv_buffer_prep(raw_data, size_raw);
                 p_sliced = zvbi_xs_sv_buffer_prep(sliced_data, size_sliced);
-                RETVAL = vbi_capture_read(capture, p_raw, p_sliced, &lines, &timestamp, &timeout);
+                RETVAL = vbi_capture_read(capture, p_raw, p_sliced, &n_lines, &timestamp, &tv);
         } else {
                 RETVAL = -1;
         }
         OUTPUT:
         raw_data
         sliced_data
-        lines
+        n_lines
         timestamp
         RETVAL
 
 int
-vbi_capture_pull_raw(capture, buffer, timestamp, msecs)
+vbi_capture_pull_raw(capture, buffer, timestamp, timeout_ms)
         VbiCaptureObj * capture
         VbiRawBuffer * &buffer = NO_INIT
         double &timestamp = NO_INIT
-        int msecs
+        int timeout_ms
         PREINIT:
-        struct timeval timeout;
+        struct timeval tv;
         CODE:
-        timeout.tv_sec  = msecs / 1000;
-        timeout.tv_usec = (msecs % 1000) * 1000;
-        RETVAL = vbi_capture_pull_raw(capture, &buffer, &timeout);
+        tv.tv_sec  = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+        RETVAL = vbi_capture_pull_raw(capture, &buffer, &tv);
         if (RETVAL > 0) {
                 timestamp = buffer->timestamp;
         } else {
@@ -737,45 +820,45 @@ vbi_capture_pull_raw(capture, buffer, timestamp, msecs)
         RETVAL
 
 int
-vbi_capture_pull_sliced(capture, buffer, lines, timestamp, msecs)
+vbi_capture_pull_sliced(capture, buffer, n_lines, timestamp, timeout_ms)
         VbiCaptureObj * capture
         VbiSlicedBuffer * &buffer = NO_INIT
-        int &lines = NO_INIT
+        int &n_lines = NO_INIT
         double &timestamp = NO_INIT
-        int msecs
+        int timeout_ms
         PREINIT:
-        struct timeval timeout;
+        struct timeval tv;
         CODE:
-        timeout.tv_sec  = msecs / 1000;
-        timeout.tv_usec = (msecs % 1000) * 1000;
-        RETVAL = vbi_capture_pull_sliced(capture, &buffer, &timeout);
+        tv.tv_sec  = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+        RETVAL = vbi_capture_pull_sliced(capture, &buffer, &tv);
         if (RETVAL > 0) {
                 timestamp = buffer->timestamp;
-                lines = buffer->size / sizeof(vbi_sliced);
+                n_lines = buffer->size / sizeof(vbi_sliced);
         } else {
                 timestamp = 0.0;
-                lines = 0;
+                n_lines = 0;
         }
         OUTPUT:
         buffer
-        lines
+        n_lines
         timestamp
         RETVAL
 
 int
-vbi_capture_pull(capture, raw_buffer, sliced_buffer, sliced_lines, timestamp, msecs)
+vbi_capture_pull(capture, raw_buffer, sliced_buffer, sliced_lines, timestamp, timeout_ms)
         VbiCaptureObj * capture
         VbiRawBuffer * &raw_buffer
         VbiSlicedBuffer * &sliced_buffer
         int &sliced_lines = NO_INIT
         double &timestamp = NO_INIT
-        int msecs
+        int timeout_ms
         PREINIT:
-        struct timeval timeout;
+        struct timeval tv;
         CODE:
-        timeout.tv_sec  = msecs / 1000;
-        timeout.tv_usec = (msecs % 1000) * 1000;
-        RETVAL = vbi_capture_pull(capture, &raw_buffer, &sliced_buffer, &timeout);
+        tv.tv_sec  = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+        RETVAL = vbi_capture_pull(capture, &raw_buffer, &sliced_buffer, &tv);
         if (RETVAL > 0) {
                 timestamp = raw_buffer->timestamp;
                 sliced_lines = sliced_buffer->size / sizeof(vbi_sliced);
@@ -1062,7 +1145,7 @@ decode(vbi, sv_sliced, lines, timestamp)
         }
 
 void
-channel_switched(vbi, nuid)
+channel_switched(vbi, nuid=0)
         VbiVtObj * vbi
         vbi_nuid nuid
         CODE:
@@ -1141,7 +1224,7 @@ fetch_vt_page(vbi, pgno, subno, max_level, display_rows, navigation)
         RETVAL
 
 VbiPageObj *
-fetch_cc_page(vbi, pgno, reset=0)
+fetch_cc_page(vbi, pgno, reset)
         VbiVtObj * vbi
         vbi_pgno pgno
         vbi_bool reset
@@ -1252,12 +1335,35 @@ DESTROY(pg_obj)
         }
         Safefree(pg_obj);
 
+SV *
+draw_vt_page(pg_obj, fmt=VBI_PIXFMT_RGBA32_LE, reveal=0, flash_on=0)
+        VbiPageObj * pg_obj
+        vbi_pixfmt fmt
+        int reveal
+        int flash_on
+        PREINIT:
+        int canvas_size;
+        char * p_buf;
+        int rowstride;
+        CODE:
+        RETVAL = newSVpvn("", 0);
+        rowstride = pg_obj->p_pg->columns * 12 * sizeof(vbi_rgba);
+        canvas_size = rowstride * pg_obj->p_pg->rows * 10;
+        p_buf = zvbi_xs_sv_canvas_prep(RETVAL, canvas_size, 1);
+        memset(p_buf, 0, canvas_size);
+        vbi_draw_vt_page_region(pg_obj->p_pg, fmt, p_buf, rowstride, 0, 0,
+                                pg_obj->p_pg->columns, pg_obj->p_pg->rows, reveal, flash_on);
+        OUTPUT:
+        RETVAL
+
 void
-draw_vt_page_region(pg_obj, fmt, canvas, rowstride, column, row, width, height, reveal=0, flash_on=0)
+draw_vt_page_region(pg_obj, fmt, canvas, rowstride, col_off, row_off, column, row, width, height, reveal=0, flash_on=0)
         VbiPageObj * pg_obj
         vbi_pixfmt fmt
         SV * canvas
         int rowstride
+        int col_off
+        int row_off
         int column
         int row
         int width
@@ -1271,32 +1377,40 @@ draw_vt_page_region(pg_obj, fmt, canvas, rowstride, column, row, width, height, 
         if (rowstride < 0) {
                 rowstride = pg_obj->p_pg->columns * 12 * sizeof(vbi_rgba);
         }
-        canvas_size = rowstride * height * 10;
-        p_buf = zvbi_xs_sv_buffer_prep(canvas, canvas_size);
-        vbi_draw_vt_page_region(pg_obj->p_pg, fmt, p_buf, rowstride, column, row, width, height, reveal, flash_on);
+        if (row_off + width > pg_obj->p_pg->rows) {
+                width = pg_obj->p_pg->rows - row_off;
+        }
+        if (col_off + height > pg_obj->p_pg->columns) {
+                height = pg_obj->p_pg->columns - col_off;
+        }
+        if (rowstride < (row_off + width) * 12 * sizeof(vbi_rgba)) {
+                rowstride = 0;
+        }
+        if ((width > 0) && (height > 0) && (col_off > 0) && (row_off > 0) && (rowstride > 0)) {
+                canvas_size = rowstride * (row_off + height) * 10;
+                p_buf = zvbi_xs_sv_canvas_prep(canvas, canvas_size, 0);
+                vbi_draw_vt_page_region(pg_obj->p_pg, fmt,
+                                        p_buf + (row_off * rowstride) + (col_off * 12),
+                                        rowstride,
+                                        column, row, width, height, reveal, flash_on);
+        }
         OUTPUT:
         canvas
 
-void
-draw_vt_page(pg_obj, fmt, canvas, reveal=0, flash_on=0)
+SV *
+draw_cc_page(pg_obj, fmt=VBI_PIXFMT_RGBA32_LE)
         VbiPageObj * pg_obj
         vbi_pixfmt fmt
-        SV * canvas
-        int reveal
-        int flash_on
         PREINIT:
         int canvas_size;
         char * p_buf;
-        int rowstride;
         CODE:
-        rowstride = pg_obj->p_pg->columns * 12 * sizeof(vbi_rgba);
-        canvas_size = rowstride * pg_obj->p_pg->rows * 10;
-        p_buf = zvbi_xs_sv_buffer_prep(canvas, canvas_size);
-        memset(p_buf, 0, canvas_size);
-        vbi_draw_vt_page_region(pg_obj->p_pg, fmt, p_buf, rowstride, 0, 0,
-                                pg_obj->p_pg->columns, pg_obj->p_pg->rows, reveal, flash_on);
+        RETVAL = newSVpvn("", 0);
+        canvas_size = (pg_obj->p_pg->columns * 16 * sizeof(vbi_rgba)) * pg_obj->p_pg->rows * 26;
+        p_buf = zvbi_xs_sv_canvas_prep(RETVAL, canvas_size, 1);
+        vbi_draw_cc_page_region(pg_obj->p_pg, fmt, p_buf, -1, 0, 0, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
         OUTPUT:
-        canvas
+        RETVAL
 
 void
 draw_cc_page_region(pg_obj, fmt, canvas, rowstride, column, row, width, height)
@@ -1316,36 +1430,46 @@ draw_cc_page_region(pg_obj, fmt, canvas, rowstride, column, row, width, height)
                 rowstride = pg_obj->p_pg->columns * 16 * sizeof(vbi_rgba);
         }
         canvas_size = rowstride * height * 26;
-        p_buf = zvbi_xs_sv_buffer_prep(canvas, canvas_size);
+        p_buf = zvbi_xs_sv_canvas_prep(canvas, canvas_size, 0);
         vbi_draw_cc_page_region(pg_obj->p_pg, fmt, p_buf, rowstride, column, row, width, height);
         OUTPUT:
         canvas
 
-void
-draw_cc_page(pg_obj, fmt, canvas)
+SV *
+draw_blank(pg_obj, fmt=VBI_PIXFMT_RGBA32_LE, pix_height=0, rowstride=-1)
         VbiPageObj * pg_obj
         vbi_pixfmt fmt
-        SV * canvas
+        int pix_height
+        int rowstride
         PREINIT:
         int canvas_size;
-        char * p_buf;
         CODE:
-        canvas_size = (pg_obj->p_pg->columns * 16 * sizeof(vbi_rgba)) * pg_obj->p_pg->rows * 26;
-        p_buf = zvbi_xs_sv_buffer_prep(canvas, canvas_size);
-        vbi_draw_cc_page_region(pg_obj->p_pg, fmt, p_buf, -1, 0, 0, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
+        RETVAL = newSVpvn("", 0);
+        if (pix_height <= 0) {
+                if (pg_obj->p_pg->columns < 40) {
+                        pix_height = pg_obj->p_pg->rows * 26;
+                } else {
+                        pix_height = pg_obj->p_pg->rows * 10;
+                }
+        }
+        if (rowstride <= 0) {
+                rowstride = pg_obj->p_pg->columns * 16 * sizeof(vbi_rgba);
+        }
+        canvas_size = rowstride * pix_height;
+        zvbi_xs_sv_canvas_prep(RETVAL, canvas_size, 1);
         OUTPUT:
-        canvas
+        RETVAL
 
 SV *
-rgba_to_xpm(sv_canvas, rowstride, width, height)
+rgba_to_xpm(pg_obj, sv_canvas, rowstride=-1, width=0)
+        VbiPageObj * pg_obj
         SV * sv_canvas
         int rowstride
         int width
-        int height
         PREINIT:
         vbi_rgba * p_img;
         STRLEN buf_size;
-        STRLEN size;
+        int pix_height;
         int idx;
         HV * hv;
         char key[20];
@@ -1362,29 +1486,42 @@ rgba_to_xpm(sv_canvas, rowstride, width, height)
                 XSRETURN_UNDEF;
         }
         p_img = (void *) SvPV(sv_canvas, buf_size);
-        if (rowstride < 0) {
-                rowstride = width * 12 * sizeof(vbi_rgba);
+        if (rowstride <= 0) {
+                if (pg_obj->p_pg->columns < 40) {
+                        rowstride = pg_obj->p_pg->columns * 16 * sizeof(vbi_rgba);
+                } else {
+                        rowstride = pg_obj->p_pg->columns * 12 * sizeof(vbi_rgba);
+                }
         }
-        size = rowstride * height * 10;
-        if (size != buf_size) {
-                Perl_croak(aTHX_ "Input buffer size mismatch");
+        if (buf_size % rowstride != 0) {
+                Perl_croak(aTHX_ "Input buffer size doesn't match rowstride");
                 XSRETURN_UNDEF;
         }
+        pix_height = buf_size / rowstride;
+        /*
+         * Determine the color palette
+         */
         hv = newHV();
         col_idx = 0;
-        for (idx = 0; idx < size / sizeof(vbi_rgba); idx++) {
+        for (idx = 0; idx < buf_size / sizeof(vbi_rgba); idx++) {
                 sprintf(key, "%06X", p_img[idx] & 0xFFFFFF);
                 if (!hv_exists(hv, key, 6)) {
                         hv_store(hv, key, 6, newSViv(col_idx), 0);
                         col_idx += 1;
                 }
         }
+        /*
+         * Write the image header (including image dimensions)
+         */
         RETVAL = newSVpvf("/* XPM */\n"
                           "static char *image[] = {\n"
                           "/* width height ncolors chars_per_pixel */\n"
                           "\"%d %d %d %d\",\n"
                           "/* colors */\n",
-                          rowstride / sizeof(vbi_rgba), height * 10, col_idx, 1);
+                          rowstride / sizeof(vbi_rgba), pix_height, col_idx, 1);
+        /*
+         * Write the color palette
+         */
         hv_iterinit(hv);
         while ((sv = hv_iternextsv(hv, &p_key, &key_len)) != NULL) {
                 int cval;
@@ -1395,9 +1532,12 @@ rgba_to_xpm(sv_canvas, rowstride, width, height)
                                   (cval >> 8) & 0xFF,
                                   (cval >> 16) & 0xFF);
         }
+        /*
+         * Write the image row by row
+         */
         sv_catpv(RETVAL, "/* pixels */\n");
         code[1] = 0;
-        for (row = 0; row < height * 10; row++) {
+        for (row = 0; row < pix_height; row++) {
                 sv_catpv(RETVAL, "\"");
                 idx = row * rowstride / sizeof(vbi_rgba);
                 for (col = 0; col < rowstride / sizeof(vbi_rgba); col++, idx++) {
@@ -1431,15 +1571,14 @@ get_vt_cell_size()
         PUSHs (sv_2mortal (newSViv (w)));
         PUSHs (sv_2mortal (newSViv (h)));
 
-
 int
-print_page_region(pg_obj, sv_buf, size, format, table, ltr, column, row, width, height)
+print_page_region(pg_obj, sv_buf, size, format, table, rtl, column, row, width, height)
         VbiPageObj * pg_obj
         SV * sv_buf
         int size
         const char * format
         vbi_bool table
-        vbi_bool ltr
+        vbi_bool rtl
         int column
         int row
         int width
@@ -1448,7 +1587,7 @@ print_page_region(pg_obj, sv_buf, size, format, table, ltr, column, row, width, 
         char * p_buf = zvbi_xs_sv_buffer_prep(sv_buf, size);
         CODE:
         RETVAL = vbi_print_page_region(pg_obj->p_pg, p_buf, size,
-                                       format, table, ltr,
+                                       format, table, rtl,
                                        column, row, width, height);
         p_buf[RETVAL] = 0;
         SvCUR_set(sv_buf, RETVAL);
@@ -1456,24 +1595,28 @@ print_page_region(pg_obj, sv_buf, size, format, table, ltr, column, row, width, 
         sv_buf
         RETVAL
 
-int
-print_page(pg_obj, sv_buf, size, format, table, ltr)
+SV *
+print_page(pg_obj, table=0, rtl=0)
         VbiPageObj * pg_obj
-        SV * sv_buf
-        int size
-        const char * format
         vbi_bool table
-        vbi_bool ltr
+        vbi_bool rtl
         PREINIT:
-        char * p_buf = zvbi_xs_sv_buffer_prep(sv_buf, size);
+        const int max_size = 40 * 25 * 4;
+        int size;
+        char * p_buf;
         CODE:
-        RETVAL = vbi_print_page_region(pg_obj->p_pg, p_buf, size,
-                                       format, table, ltr,
-                                       0, 0, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
-        p_buf[RETVAL] = 0;
-        SvCUR_set(sv_buf, RETVAL);
+        RETVAL = newSVpvn("", 0);
+        p_buf = zvbi_xs_sv_buffer_prep(RETVAL, max_size);
+        size = vbi_print_page_region(pg_obj->p_pg, p_buf, max_size,
+                                     "UTF-8", table, rtl,
+                                     0, 0, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
+        if ((size < 0) || (size >= max_size)) {
+                size = 0;
+        }
+        p_buf[size] = 0;
+        SvCUR_set(RETVAL, size);
+        SvUTF8_on(RETVAL);
         OUTPUT:
-        sv_buf
         RETVAL
 
 void
@@ -1561,7 +1704,7 @@ get_page_text(pg_obj, all_chars=0)
         RETVAL
 
 HV *
-vbi_resolve_link(pg_obj, column, row)
+resolve_link(pg_obj, column, row)
         VbiPageObj * pg_obj
         int column
         int row
@@ -1576,7 +1719,7 @@ vbi_resolve_link(pg_obj, column, row)
         RETVAL
 
 HV *
-vbi_resolve_home(pg_obj)
+resolve_home(pg_obj)
         VbiPageObj * pg_obj
         PREINIT:
         vbi_link ld;
@@ -1614,11 +1757,11 @@ void
 vbi_export_info_enum(index)
         int index
         PREINIT:
-        vbi_export_info * info;
+        vbi_export_info * p_info;
         PPCODE:
-        info = vbi_export_info_enum(index);
-        if (info != NULL) {
-                HV * hv = zvbi_xs_export_info_to_hv(info);
+        p_info = vbi_export_info_enum(index);
+        if (p_info != NULL) {
+                HV * hv = zvbi_xs_export_info_to_hv(p_info);
                 EXTEND(sp,1);
                 PUSHs (sv_2mortal (newRV_noinc ((SV*)hv)));
         }
@@ -1627,11 +1770,11 @@ void
 vbi_export_info_keyword(keyword)
         const char * keyword
         PREINIT:
-        vbi_export_info * info;
+        vbi_export_info * p_info;
         PPCODE:
-        info = vbi_export_info_keyword(keyword);
-        if (info != NULL) {
-                HV * hv = zvbi_xs_export_info_to_hv(info);
+        p_info = vbi_export_info_keyword(keyword);
+        if (p_info != NULL) {
+                HV * hv = zvbi_xs_export_info_to_hv(p_info);
                 EXTEND(sp,1);
                 PUSHs (sv_2mortal (newRV_noinc ((SV*)hv)));
         }
@@ -1640,47 +1783,105 @@ void
 vbi_export_info_export(exp)
         VbiExportObj * exp
         PREINIT:
-        vbi_export_info * info;
+        vbi_export_info * p_info;
         PPCODE:
-        info = vbi_export_info_export(exp);
-        if (info != NULL) {
-                HV * hv = zvbi_xs_export_info_to_hv(info);
+        p_info = vbi_export_info_export(exp);
+        if (p_info != NULL) {
+                HV * hv = zvbi_xs_export_info_to_hv(p_info);
                 EXTEND(sp,1);
                 PUSHs (sv_2mortal (newRV_noinc ((SV*)hv)));
         }
 
- #vbi_option_info *        vbi_export_option_info_enum(VbiExportObj *, int index);
- #vbi_option_info *        vbi_export_option_info_keyword(VbiExportObj *, const char *keyword);
+void
+vbi_export_option_info_enum(exp, index)
+        VbiExportObj * exp
+        int index
+        PREINIT:
+        vbi_option_info * p_opt;
+        PPCODE:
+        p_opt = vbi_export_option_info_enum(exp, index);
+        if (p_opt != NULL) {
+                HV * hv = zvbi_xs_export_option_info_to_hv(p_opt);
+                EXTEND(sp, 1);
+                PUSHs (sv_2mortal (newRV_noinc ((SV*)hv)));
+        }
+
+void
+vbi_export_option_info_keyword(exp, keyword)
+        VbiExportObj * exp
+        const char *keyword
+        PREINIT:
+        vbi_option_info * p_opt;
+        PPCODE:
+        p_opt = vbi_export_option_info_keyword(exp, keyword);
+        if (p_opt != NULL) {
+                HV * hv = zvbi_xs_export_option_info_to_hv(p_opt);
+                EXTEND(sp, 1);
+                PUSHs (sv_2mortal (newRV_noinc ((SV*)hv)));
+        }
 
 vbi_bool
 vbi_export_option_set(exp, keyword, sv)
         VbiExportObj * exp
         const char * keyword
         SV * sv
+        PREINIT:
+        vbi_option_info * p_info;
         CODE:
-        /* FIXME */
-        if ( (strcmp(keyword, "network") == 0) ||
-             (strcmp(keyword, "creator") == 0) ) {
-                RETVAL = vbi_export_option_set(exp, keyword, SvIV(sv));
-        } else {
-                RETVAL = vbi_export_option_set(exp, keyword, SvPV_nolen(sv));
+        RETVAL = 0;
+        p_info = vbi_export_option_info_keyword(exp, keyword);
+        if (p_info != NULL) {
+                switch (p_info->type) {
+                case VBI_OPTION_BOOL:
+                case VBI_OPTION_INT:
+                case VBI_OPTION_MENU:
+                        RETVAL = vbi_export_option_set(exp, keyword, SvIV(sv));
+                        break;
+                case VBI_OPTION_REAL:
+                        RETVAL = vbi_export_option_set(exp, keyword, SvNV(sv));
+                        break;
+                case VBI_OPTION_STRING:
+                        RETVAL = vbi_export_option_set(exp, keyword, SvPV_nolen(sv));
+                        break;
+                default:
+                        break;
+                }
         }
         OUTPUT:
         RETVAL
 
-vbi_bool
-vbi_export_option_get(exp, keyword, value)
+void
+vbi_export_option_get(exp, keyword)
         VbiExportObj * exp
         const char * keyword
-        SV * value
         PREINIT:
         vbi_option_value opt_val;
-        CODE:
-        /* TODO: convert opt_val into SV; problem: can't easily deduce type of option value */
-        RETVAL = vbi_export_option_get(exp, keyword, &opt_val);
-        OUTPUT:
-        value
-        RETVAL
+        vbi_option_info * p_info;
+        PPCODE:
+        p_info = vbi_export_option_info_keyword(exp, keyword);
+        if (p_info != NULL) {
+                if (vbi_export_option_get(exp, keyword, &opt_val)) {
+                        switch (p_info->type) {
+                        case VBI_OPTION_BOOL:
+                        case VBI_OPTION_INT:
+                        case VBI_OPTION_MENU:
+                                EXTEND(sp, 1);
+                                PUSHs (sv_2mortal (newSViv (opt_val.num)));
+                                break;
+                        case VBI_OPTION_REAL:
+                                EXTEND(sp, 1);
+                                PUSHs (sv_2mortal (newSVnv (opt_val.dbl)));
+                                break;
+                        case VBI_OPTION_STRING:
+                                EXTEND(sp, 1);
+                                PUSHs (sv_2mortal (newSVpv (opt_val.str, 0)));
+                                free(opt_val.str);
+                                break;
+                        default:
+                                break;
+                        }
+                }
+        }
 
 vbi_bool
 vbi_export_option_menu_set(exp, keyword, entry)
@@ -1688,13 +1889,17 @@ vbi_export_option_menu_set(exp, keyword, entry)
         const char * keyword
         int entry
 
-vbi_bool
-vbi_export_option_menu_get(exp, keyword, entry)
+void
+vbi_export_option_menu_get(exp, keyword)
         VbiExportObj * exp
         const char * keyword
-        int &entry = NO_INIT
-        OUTPUT:
-        entry
+        PREINIT:
+        int entry;
+        PPCODE:
+        if (vbi_export_option_menu_get(exp, keyword, &entry)) {
+                EXTEND(sp, 1);
+                PUSHs (sv_2mortal (newSViv (entry)));
+        }
 
 vbi_bool
 vbi_export_stdio(exp, fp, pg_obj)
@@ -1923,6 +2128,27 @@ unham24p(data, offset=0)
         RETVAL
 
  # ---------------------------------------------------------------------------
+ #  BCD arithmetic
+ # ---------------------------------------------------------------------------
+
+int
+vbi_dec2bcd(dec)
+        unsigned int dec
+
+unsigned int
+vbi_bcd2dec(bcd)
+        unsigned int bcd
+
+unsigned int
+vbi_add_bcd(a, b)
+   unsigned int a
+   unsigned int b
+
+vbi_bool
+vbi_is_bcd(bcd)
+        unsigned int bcd
+
+ # ---------------------------------------------------------------------------
  #  Miscellaneous
  # ---------------------------------------------------------------------------
 
@@ -2110,4 +2336,10 @@ BOOT:
 
         /* export */
         newCONSTSUB(stash, "VBI_PIXFMT_RGBA32_LE", newSViv(VBI_PIXFMT_RGBA32_LE));
+
+        newCONSTSUB(stash, "VBI_OPTION_BOOL", newSViv(VBI_OPTION_BOOL));
+        newCONSTSUB(stash, "VBI_OPTION_INT", newSViv(VBI_OPTION_INT));
+        newCONSTSUB(stash, "VBI_OPTION_REAL", newSViv(VBI_OPTION_REAL));
+        newCONSTSUB(stash, "VBI_OPTION_STRING", newSViv(VBI_OPTION_STRING));
+        newCONSTSUB(stash, "VBI_OPTION_MENU", newSViv(VBI_OPTION_MENU));
 }

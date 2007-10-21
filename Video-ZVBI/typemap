@@ -45,8 +45,6 @@ VbiDvbDemuxObj *	PO
 VbiRawBuffer *		T_PTROBJ
 VbiSlicedBuffer *	T_PTROBJ
 
-VbiBufVar		T_SV
-
 #############################################################################
 INPUT
 
