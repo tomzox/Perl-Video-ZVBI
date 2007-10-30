@@ -13,7 +13,7 @@ DLSIP-code:     bcdOg
                 - licensed under GPL (GNU General Public License)
 
 Supported OS:   Linux, FreeBSD, NetBSD, OpenBSD
-Author:         TOMZO (Tom Zoerner <tomzo AT nefkom DOT net>)
+Author:         TOMZO (Tom Zoerner <tomzo@users.sourceforge.net>)
 URL:            http://www.perl.com/CPAN/authors/Tom_Zoerner/
 
 
@@ -26,33 +26,33 @@ closed captions via analog or DVB video capture devices.
 
 Official ZVBI library description:
 
-"The ZVBI library provides routines to access raw VBI sampling devices
-(currently the Linux V4L and and V4L2 API and the FreeBSD, OpenBSD,
-NetBSD and BSDi bktr driver API are supported), a versatile raw VBI
-bit slicer, decoders for various data services and basic search, render
-and export functions for text pages. The library was written for the
-Zapping TV viewer and Zapzilla Teletext browser."
+  "The ZVBI library provides routines to access raw VBI sampling devices
+  (currently the Linux V4L and and V4L2 API and the FreeBSD, OpenBSD,
+  NetBSD and BSDi bktr driver API are supported), a versatile raw VBI
+  bit slicer, decoders for various data services and basic search, render
+  and export functions for text pages. The library was written for the
+  Zapping TV viewer and Zapzilla Teletext browser."
 
-The ZVBI Perl module supports almost all exported libzvbi functions
-(see manual page), however some work still needs to be done for DVB,
-callback user parameters, export options and page search.
+The ZVBI Perl module covers all exported libzvbi functions.
 
-The Perl interface is based on blessed references to binary pointers.
-Internally the module uses the native C structures of libzvbi as
-far as possible.  Only in the last step, when a Perl script wants
+The Perl interface is largely based on blessed references to binary
+pointers. Internally the module uses the native C structures of libzvbi
+as far as possible.  Only in the last step, when a Perl script wants
 to manipulate captured data directly (i.e. not via library functions),
-the structures are copied into Perl data types.  This approach allows
-for a pretty snappy performace.
+the structures' data is copied into Perl data types.  This approach
+allows for a pretty snappy performance.
 
 Best starting point to get familiar with the module is to have a look
 at <http://zapping.sourceforge.net/doc/libzvbi/index.html> and the
 examples scripts provided in the example/ subdirectory: these are
 more or less direct C to Perl ports of the respective programs in
-the test/ subdirectory of the libzvbi sources.
+the test/ subdirectory of the libzvbi sources with a few additions,
+such as a teletext level 2.5 browser implemented in ~200 lines of
+Perl::Tk.
 
 
-Comparison with Video-Capture-VBI
----------------------------------
+Comparison with the Video-Capture::VBI module
+---------------------------------------------
 
 You may have noticed that there already is a Perl VBI module which
 provides very similar functionality.  The reason that a separate
@@ -60,8 +60,8 @@ module was created is that the approach is completely different:
 the VBI module contains an actual implementation of a teletext and
 VPS slicers and databases, while ZVBI is just an interface layer.
 
-libzvbi is a much more sophisticated and modern implementation and
-and supports a wider range of platforms, drivers and data services.
+libzvbi is a very sophisticated and up-to-date implementation and
+as such supports a wide range of platforms, drivers and data services.
 The library is actively maintained by Michael Schimek, who was one
 of the authors of the VBI interfaces in V4L and V4L2 (i.e. the Linux
 video capture API.)  In contrast, most of the VBI module's code
@@ -73,10 +73,11 @@ and support for V4l2), or to duplicate code from libzvbi into the
 VBI module.  That would have been much more effort and certainly
 less elegant than just creating an interface to libzvbi.
 
-Other benefits are that libzvbi has good documentation and is
+Other benefits are that libzvbi has extensice documentation and is
 optimized for performance (i.e. the ZVBI Perl module is about
-10 times faster than the VBI module.)  The only downside is
-Nextview EPG, which is supported in VBI, but not in linzvbi.
+5 to 10 times faster when capturing teletext packets into a file
+than the VBI module.)  The only downside is EPG (ETS 300 707),
+which is supported by the VBI module, but not by libzvbi.
 
 
 Installation
@@ -99,7 +100,7 @@ Copyright (C) 2006-2007 Th. "Tom" Zoerner. All rights reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
+the Free Software Foundation, either version 2 of the License, or
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,

@@ -3,7 +3,7 @@
 #  libzvbi test
 #
 #  Copyright (C) 2000, 2001 Michael H. Schimek
-#  Perl Port: Copyright (C) 2006 Tom Zoerner
+#  Perl Port: Copyright (C) 2006, 2007 Tom Zoerner
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ my $pgno;
 my $ex;
 my $extension;
 my $cr;
-#my $dx;
+my $dx;
 
 
 sub handler {
@@ -89,34 +89,30 @@ sub handler {
         }
 }
 
-#sub pes_mainloop
-#{
-#        my $buffer;
-#
-#        while (sysread (STDIN, $buffer, 2048) > 0) {
-#                const uint8_t *bp;
-#                unsigned int left;
-#
-#                bp = buffer;
-#                left = sizeof (buffer);
-#
-#                while (left > 0) {
-#                        vbi_sliced sliced[64];
-#                        unsigned int lines;
-#                        int64_t pts;
-#
-#                        $lines = vbi_dvb_demux_cor (dx, sliced, 64,
-#                                                    &pts, &bp, &left);
-#                        if ($lines > 0) {
-#                                $vbi->decode (sliced, lines, pts / 90000.0);
-#                        }
-#
-#                        return if $quit;
-#                }
-#        }
-#
-#        printf STDERR "\rEnd of stream, page %03x not found\n", $pgno;
-#}
+sub pes_mainloop
+{
+        my $buffer;
+
+        while (sysread (STDIN, $buffer, 2048) > 0) {
+                my $buf_left = length($buffer);
+
+                while ($buf_left > 0) {
+                        my $sliced;
+                        my $lines;
+                        my $pts;
+
+                        $lines = $dx->demux_cor ($sliced, 64,
+                                                 $pts, $buffer, $buf_left);
+                        if ($lines > 0) {
+                                $vbi->decode ($sliced, $lines, $pts / 90000.0);
+                        }
+
+                        return if $quit;
+                }
+        }
+
+        printf STDERR "\rEnd of stream, page %03x not found\n", $pgno;
+}
 
 sub old_mainloop
 {
@@ -167,33 +163,32 @@ sub main_func
         die "Invalid page number: $ARGV[1]\n" if ($pgno < 0x100) || ($pgno > 0x8FF);
 
         $ex = Video::Capture::ZVBI::export::new($module, $t);
-        if (!defined $ex) {
-                print STDERR "Failed to open export module '$module': $t\n";
-                exit(-1);
-        }
+        die "Failed to open export module '$module': $t\n" unless defined $ex;
 
-        my $xi = $ex->info_export() || die;
+        my $xi = $ex->info_export();
+        die "Failed to create export context\n" unless defined $xi;
         $extension = $xi->{extension};
         $extension =~ s#,.*##;
         undef $xi;
 
-        $vbi = Video::Capture::ZVBI::vt::decoder_new() || die;
+        $vbi = Video::Capture::ZVBI::vt::decoder_new();
+        die "Failed to create VT decoder\n" unless defined $vbi;
 
-        $vbi->event_handler_add(Video::Capture::ZVBI::VBI_EVENT_TTX_PAGE, \&handler); 
+        my $ok = $vbi->event_handler_add(Video::Capture::ZVBI::VBI_EVENT_TTX_PAGE, \&handler); 
+        die "Failed to install VT event handler\n" unless $ok;
 
         my $c = 1;
         #my $c = getc();
         #IO::Handle::ungetc($c);
 
         if (0 == $c) {
-                #dx = vbi_dvb_pes_demux_new (/* callback */ NULL, NULL) || die;
+                $dx = Video::Capture::ZVBI::DVB::pes_demux_new();
+                die unless defined $dx;
 
-                #pes_mainloop ();
+                pes_mainloop ();
         } else {
                 old_mainloop ();
         }
-
-        exit(-1);
 }
 
 main_func();

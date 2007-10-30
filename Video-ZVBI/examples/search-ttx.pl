@@ -28,16 +28,17 @@ use Video::Capture::ZVBI;
 my $cr;
 
 sub pg_handler {
-   my($type, $ev, $user_data) = @_;
+   my($type, $ev, $lcr) = @_;
 
-   printf STDERR "${cr}Page %03x.%02x ",
+   printf STDERR "${lcr}Page %03x.%02x ",
            $ev->{pgno},
            $ev->{subno} & 0xFF;
 }
 
 sub progress {
-   my ($page,$sub) = $_[0]->get_page_no();
-   printf "${cr}Searching %03X.%04x ", $page, $sub;
+   my ($pg,$user_data) = @_;
+   my ($page,$sub) = $pg->get_page_no();
+   printf "${cr}Search #$user_data->[0] %03X.%04x ", $page, $sub;
 }
 
 sub search {
@@ -53,7 +54,9 @@ sub search {
       my $last_page;
       my $last_sub;
 
-      $srch = Video::Capture::ZVBI::search::new($vtdec, 0x100, $any_sub, $pat, 0, 0, \&progress);
+      my $rand = [int(rand(1000))];
+      print "Search rand user data $rand->[0]\n";
+      $srch = Video::Capture::ZVBI::search::new($vtdec, 0x100, $any_sub, $pat, 0, 0, \&progress, $rand);
       die "failed to initialize search: $!\n" unless $srch;
 
       while (($stat = $srch->next($pg, 1)) == Video::Capture::ZVBI::VBI_SEARCH_SUCCESS) {
@@ -95,7 +98,7 @@ sub main_func {
    $vtdec = Video::Capture::ZVBI::vt::decoder_new();
    die "failed to create teletext decoder: $!\n" unless defined $vtdec;
 
-   $vtdec->event_handler_add(Video::Capture::ZVBI::VBI_EVENT_TTX_PAGE, \&pg_handler); 
+   $vtdec->event_handler_register(Video::Capture::ZVBI::VBI_EVENT_TTX_PAGE, \&pg_handler, $cr); 
 
    print STDERR "Press RETURN to stop capture and enter a search pattern\n";
 

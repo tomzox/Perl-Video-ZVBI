@@ -40,6 +40,9 @@ VbiExportObj *		PO
 VbiSearchObj *		PO
 VbiPageObj *		PO
 VbiDvbDemuxObj *	PO
+VbiIdlDemuxObj *	PO
+VbiPfcDemuxObj *	PO
+VbiXdsDemuxObj *	PO
 
 # plain pointer
 VbiRawBuffer *		T_PTROBJ

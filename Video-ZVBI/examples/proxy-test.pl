@@ -38,9 +38,9 @@ use POSIX;
 use Fcntl;
 use strict;
 
-      my $VIDIOCGCHAN = 0; #TODO
-      my $VIDIOCSCHAN = 0; #TODO
-      my $VIDIOCSFREQ = 0; #TODO
+sub VIDIOCGCHAN { 0xC0307602 }
+sub VIDIOCSCHAN { 0x40307603 }
+sub VIDIOCSFREQ { 0x4008760F }
 
 my $opt_device = "/dev/vbi0";
 my $opt_buf_count = 5;
@@ -76,7 +76,6 @@ sub SwitchTvChannel {
    my $vchan; #struct video_channel
    my $result = 1;
 
-   # get current config of the selected chanel
    if ($channel != -1) {
       $result = 0;
 
@@ -88,11 +87,15 @@ sub SwitchTvChannel {
       }
       $vchan = pack("ix32iLss", $channel, 0, 0, 0, $norm);
 
-      if ($proxy->device_ioctl($VIDIOCGCHAN, $vchan) == 0) {
+      # get current config of the selected chanel
+      if ($proxy->device_ioctl(VIDIOCGCHAN, $vchan) == 0) {
          ($vc_channel, $vc_tuners, $vc_flags, $vc_type, $vc_norm) = unpack("ix32iLss", $vchan);
+
+         # insert requested channel and norm into the struct
          $vchan = pack("ix32iLss", $channel, $vc_tuners, $vc_flags, $vc_type, $norm);
 
-         if ($proxy->device_ioctl($VIDIOCSCHAN, &vchan) == 0) {
+         # send channel change request
+         if ($proxy->device_ioctl(VIDIOCSCHAN, $vchan) == 0) {
             $result = 1;
          } else {
             print STDERR "ioctl VIDIOCSCHAN: $!\n";
@@ -108,8 +111,9 @@ sub SwitchTvChannel {
       if ( ($channel == -1) ||
            (($vc_type & 1) && ($vc_flags & 1)) ) {
 
+         # send frequency change request
          my $arg = pack("L", $freq);
-         if ($proxy->device_ioctl($VIDIOCSFREQ, $arg) == 0)
+         if ($proxy->device_ioctl(VIDIOCSFREQ, $arg) == 0)
          {
             $result = 1;
          } else {
@@ -135,14 +139,18 @@ sub ProxyEventCallback {
          print STDERR "ProxyEventCallback: token was reclaimed\n";
 
          $proxy->channel_notify(Video::Capture::ZVBI::VBI_PROXY_CHN_TOKEN, 0);
+
       } elsif ($ev_mask & Video::Capture::ZVBI::VBI_PROXY_EV_CHN_GRANTED) {
          print STDERR "ProxyEventCallback: token granted\n";
 
          if (($opt_channel != -1) || ($opt_freq != -1)) {
             if (SwitchTvChannel($proxy, $opt_channel, $opt_freq)) {
-               $flags = Video::Capture::ZVBI::VBI_PROXY_CHN_TOKEN | Video::Capture::ZVBI::VBI_PROXY_CHN_FLUSH;
+               $flags = Video::Capture::ZVBI::VBI_PROXY_CHN_TOKEN |
+                        Video::Capture::ZVBI::VBI_PROXY_CHN_FLUSH;
             } else {
-               $flags = Video::Capture::ZVBI::VBI_PROXY_CHN_RELEASE | Video::Capture::ZVBI::VBI_PROXY_CHN_FAIL | Video::Capture::ZVBI::VBI_PROXY_CHN_FLUSH;
+               $flags = Video::Capture::ZVBI::VBI_PROXY_CHN_RELEASE |
+                        Video::Capture::ZVBI::VBI_PROXY_CHN_FAIL |
+                        Video::Capture::ZVBI::VBI_PROXY_CHN_FLUSH;
             }
 
             if ($opt_scanning != 0) {
@@ -301,7 +309,7 @@ my $usage =
                    "       -strict <level>     : service strictness level: 0..2\n".
                    "       -channel <index>    : switch video input channel\n".
                    "       -freq <kHz * 16>    : switch TV tuner frequency\n".
-                   "       -chnprio <0..4>     : channel switch priority\n".
+                   "       -chnprio <1..3>     : channel switch priority\n".
                    "       -subprio <0..4>     : background scheduling priority\n".
                    "       -debug <level>      : enable debug output: 1=warnings, 2=all\n".
                    "       -help               : this message\n".
@@ -447,8 +455,12 @@ sub main {
             $chn_profile->{is_valid}      = ($opt_channel != -1) || ($opt_freq != -1);
             $chn_profile->{sub_prio}      = $opt_subprio;
             $chn_profile->{min_duration}  = 10;
+
+            $proxy->channel_request($opt_chnprio, $chn_profile);
+         } else {
+            $proxy->channel_request($opt_chnprio);
+            SwitchTvChannel($proxy, $opt_channel, $opt_freq);
          }
-         $proxy->channel_request($opt_chnprio, $chn_profile);
       }
 
       # initialize services for raw capture
@@ -506,7 +518,7 @@ sub main {
                } elsif (($res > 0) && (defined($sliced))) {
                   my $ttx_lines = 0;
                   for (my $idx = 0; $idx < $line_count; $idx++) {
-                     my @a = $cap->copy_sliced_line($sliced, $idx);
+                     my @a = Video::Capture::ZVBI::get_sliced_line($sliced, $idx);
                      if ($a[1] & Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B) {
                         PrintTeletextData($a[0], $a[2], $a[1]);
                         $ttx_lines++;
@@ -546,7 +558,7 @@ sub main {
                   }
 
                   for (my $idx = 0; $idx < $line_count; $idx++) {
-                     my @a = $cap->copy_sliced_line($sliced, $idx);
+                     my @a = Video::Capture::ZVBI::get_sliced_line($sliced, $idx);
                      if ($a[1] & Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B) {
                         PrintTeletextData($a[0], $a[2], $a[1]);
                      } elsif ($a[1] & Video::Capture::ZVBI::VBI_SLICED_VPS) {
