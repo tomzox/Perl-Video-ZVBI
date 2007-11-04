@@ -32,15 +32,15 @@
 #
 
 use blib;
-use Video::Capture::ZVBI;
+use strict;
 use Socket;
 use POSIX;
 use Fcntl;
-use strict;
+use Video::Capture::ZVBI qw(/^VBI_*);
 
-sub VIDIOCGCHAN { 0xC0307602 }
-sub VIDIOCSCHAN { 0x40307603 }
-sub VIDIOCSFREQ { 0x4008760F }
+use constant VIDIOCGCHAN = 0xC0307602;  # from linux/videodev.h
+use constant VIDIOCSCHAN = 0x40307603;
+use constant VIDIOCSFREQ = 0x4008760F;
 
 my $opt_device = "/dev/vbi0";
 my $opt_buf_count = 5;
@@ -51,18 +51,18 @@ my $opt_strict = 0;
 my $opt_debug_level = 0;
 my $opt_channel = -1;
 my $opt_freq = -1;
-my $opt_chnprio = Video::Capture::ZVBI::VBI_CHN_PRIO_INTERACTIVE;
+my $opt_chnprio = VBI_CHN_PRIO_INTERACTIVE;
 my $opt_subprio = 0;
 
-my $all_services_625 =   ( Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B |
-                           Video::Capture::ZVBI::VBI_SLICED_VPS |
-                           Video::Capture::ZVBI::VBI_SLICED_CAPTION_625 |
-                           Video::Capture::ZVBI::VBI_SLICED_WSS_625 |
-                           Video::Capture::ZVBI::VBI_SLICED_VBI_625 );
-my $all_services_525 =   ( Video::Capture::ZVBI::VBI_SLICED_CAPTION_525 |
-                           Video::Capture::ZVBI::VBI_SLICED_2xCAPTION_525 |
-                           Video::Capture::ZVBI::VBI_SLICED_TELETEXT_BD_525 |
-                           Video::Capture::ZVBI::VBI_SLICED_VBI_525 );
+my $all_services_625 =   ( VBI_SLICED_TELETEXT_B |
+                           VBI_SLICED_VPS |
+                           VBI_SLICED_CAPTION_625 |
+                           VBI_SLICED_WSS_625 |
+                           VBI_SLICED_VBI_625 );
+my $all_services_525 =   ( VBI_SLICED_CAPTION_525 |
+                           VBI_SLICED_2xCAPTION_525 |
+                           VBI_SLICED_TELETEXT_BD_525 |
+                           VBI_SLICED_VBI_525 );
 
 my $update_services = 0;
 my $proxy; # for callback
@@ -135,35 +135,35 @@ sub ProxyEventCallback {
    #my $proxy; # XS doesn't pass data through
 
    if (defined($proxy)) {
-      if ($ev_mask & Video::Capture::ZVBI::VBI_PROXY_EV_CHN_RECLAIMED) {
+      if ($ev_mask & VBI_PROXY_EV_CHN_RECLAIMED) {
          print STDERR "ProxyEventCallback: token was reclaimed\n";
 
-         $proxy->channel_notify(Video::Capture::ZVBI::VBI_PROXY_CHN_TOKEN, 0);
+         $proxy->channel_notify(VBI_PROXY_CHN_TOKEN, 0);
 
-      } elsif ($ev_mask & Video::Capture::ZVBI::VBI_PROXY_EV_CHN_GRANTED) {
+      } elsif ($ev_mask & VBI_PROXY_EV_CHN_GRANTED) {
          print STDERR "ProxyEventCallback: token granted\n";
 
          if (($opt_channel != -1) || ($opt_freq != -1)) {
             if (SwitchTvChannel($proxy, $opt_channel, $opt_freq)) {
-               $flags = Video::Capture::ZVBI::VBI_PROXY_CHN_TOKEN |
-                        Video::Capture::ZVBI::VBI_PROXY_CHN_FLUSH;
+               $flags = VBI_PROXY_CHN_TOKEN |
+                        VBI_PROXY_CHN_FLUSH;
             } else {
-               $flags = Video::Capture::ZVBI::VBI_PROXY_CHN_RELEASE |
-                        Video::Capture::ZVBI::VBI_PROXY_CHN_FAIL |
-                        Video::Capture::ZVBI::VBI_PROXY_CHN_FLUSH;
+               $flags = VBI_PROXY_CHN_RELEASE |
+                        VBI_PROXY_CHN_FAIL |
+                        VBI_PROXY_CHN_FLUSH;
             }
 
             if ($opt_scanning != 0) {
-               $flags |= Video::Capture::ZVBI::VBI_PROXY_CHN_NORM;
+               $flags |= VBI_PROXY_CHN_NORM;
             }
          }
          else {
-            $flags = Video::Capture::ZVBI::VBI_PROXY_CHN_RELEASE;
+            $flags = VBI_PROXY_CHN_RELEASE;
          }
 
          $proxy->channel_notify($flags, $opt_scanning);
       }
-      if ($ev_mask & Video::Capture::ZVBI::VBI_PROXY_EV_NORM_CHANGED) {
+      if ($ev_mask & VBI_PROXY_EV_NORM_CHANGED) {
          print STDERR "ProxyEventCallback: TV norm changed\n";
          $update_services = 1;
       }
@@ -269,15 +269,15 @@ sub read_service_string {
             }
 
             if ( ($2 eq "ttx") || ($2 eq "teletext") ) {
-               $tmp_services = Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B | Video::Capture::ZVBI::VBI_SLICED_TELETEXT_BD_525;
+               $tmp_services = VBI_SLICED_TELETEXT_B | VBI_SLICED_TELETEXT_BD_525;
             } elsif ($2 eq "vps") {
-               $tmp_services = Video::Capture::ZVBI::VBI_SLICED_VPS;
+               $tmp_services = VBI_SLICED_VPS;
             } elsif ($2 eq "wss") {
-               $tmp_services = Video::Capture::ZVBI::VBI_SLICED_WSS_625 | Video::Capture::ZVBI::VBI_SLICED_WSS_CPR1204;
+               $tmp_services = VBI_SLICED_WSS_625 | VBI_SLICED_WSS_CPR1204;
             } elsif ( ($2 eq "cc") || ($2 eq "caption") ) {
-               $tmp_services = Video::Capture::ZVBI::VBI_SLICED_CAPTION_625 | Video::Capture::ZVBI::VBI_SLICED_CAPTION_525;
+               $tmp_services = VBI_SLICED_CAPTION_625 | VBI_SLICED_CAPTION_525;
             } elsif ($2 eq "raw") {
-               $tmp_services = Video::Capture::ZVBI::VBI_SLICED_VBI_625 | Video::Capture::ZVBI::VBI_SLICED_VBI_525;
+               $tmp_services = VBI_SLICED_VBI_625 | VBI_SLICED_VBI_525;
             } else {
                $tmp_services = 0;
             }
@@ -324,19 +324,19 @@ sub parse_argv {
 
    while ($_ = shift @ARGV) {
       if (/^(ttx|teletext)/) {
-         $opt_services |= Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B | Video::Capture::ZVBI::VBI_SLICED_TELETEXT_BD_525;
+         $opt_services |= VBI_SLICED_TELETEXT_B | VBI_SLICED_TELETEXT_BD_525;
          $have_service = 1;
       } elsif (/^vps/) {
-         $opt_services |= Video::Capture::ZVBI::VBI_SLICED_VPS;
+         $opt_services |= VBI_SLICED_VPS;
          $have_service = 1;
       } elsif (/^wss/) {
-         $opt_services |= Video::Capture::ZVBI::VBI_SLICED_WSS_625 | Video::Capture::ZVBI::VBI_SLICED_WSS_CPR1204;
+         $opt_services |= VBI_SLICED_WSS_625 | VBI_SLICED_WSS_CPR1204;
          $have_service = 1;
       } elsif (/^(cc|caption)/) {
-         $opt_services |= Video::Capture::ZVBI::VBI_SLICED_CAPTION_625 | Video::Capture::ZVBI::VBI_SLICED_CAPTION_525;
+         $opt_services |= VBI_SLICED_CAPTION_625 | VBI_SLICED_CAPTION_525;
          $have_service = 1;
       } elsif (/^raw/) {
-         $opt_services |= Video::Capture::ZVBI::VBI_SLICED_VBI_625 | Video::Capture::ZVBI::VBI_SLICED_VBI_525;
+         $opt_services |= VBI_SLICED_VBI_625 | VBI_SLICED_VBI_525;
          $have_service = 1;
       } elsif (/^null/) {
          $have_service = 1;
@@ -448,23 +448,22 @@ sub main {
 
       # switch to the requested channel
       if ( ($opt_channel != -1) || ($opt_freq != -1) ||
-           ($opt_chnprio != Video::Capture::ZVBI::VBI_CHN_PRIO_INTERACTIVE) ) {
+           ($opt_chnprio != VBI_CHN_PRIO_INTERACTIVE) ) {
          my $chn_profile = {};
 
-         if ($opt_chnprio == Video::Capture::ZVBI::VBI_CHN_PRIO_BACKGROUND) {
-            $chn_profile->{is_valid}      = ($opt_channel != -1) || ($opt_freq != -1);
-            $chn_profile->{sub_prio}      = $opt_subprio;
-            $chn_profile->{min_duration}  = 10;
+         $chn_profile->{is_valid}      = ($opt_channel != -1) || ($opt_freq != -1);
+         $chn_profile->{sub_prio}      = $opt_subprio;
+         $chn_profile->{min_duration}  = 10;
 
-            $proxy->channel_request($opt_chnprio, $chn_profile);
-         } else {
-            $proxy->channel_request($opt_chnprio);
+         $proxy->channel_request($opt_chnprio, $chn_profile);
+
+         if ($opt_chnprio != VBI_CHN_PRIO_BACKGROUND) {
             SwitchTvChannel($proxy, $opt_channel, $opt_freq);
          }
       }
 
       # initialize services for raw capture
-      if (($opt_services & (Video::Capture::ZVBI::VBI_SLICED_VBI_625 | Video::Capture::ZVBI::VBI_SLICED_VBI_525)) != 0) {
+      if (($opt_services & (VBI_SLICED_VBI_625 | VBI_SLICED_VBI_525)) != 0) {
          #my $par = $cap->parameters();
          #$raw = Video::Capture::ZVBI::rawdec::new($par);
          $raw = Video::Capture::ZVBI::rawdec::new($cap);
@@ -507,7 +506,7 @@ sub main {
          }
 
          if (vec($rd, $vbi_fd, 1) == 1) {
-            if (($opt_services & (Video::Capture::ZVBI::VBI_SLICED_VBI_625 | Video::Capture::ZVBI::VBI_SLICED_VBI_525)) == 0) {
+            if (($opt_services & (VBI_SLICED_VBI_625 | VBI_SLICED_VBI_525)) == 0) {
                my $sliced;
                my $line_count;
                my $timestamp;
@@ -519,12 +518,12 @@ sub main {
                   my $ttx_lines = 0;
                   for (my $idx = 0; $idx < $line_count; $idx++) {
                      my @a = Video::Capture::ZVBI::get_sliced_line($sliced, $idx);
-                     if ($a[1] & Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B) {
+                     if ($a[1] & VBI_SLICED_TELETEXT_B) {
                         PrintTeletextData($a[0], $a[2], $a[1]);
                         $ttx_lines++;
-                     } elsif ($a[1] & Video::Capture::ZVBI::VBI_SLICED_VPS) {
+                     } elsif ($a[1] & VBI_SLICED_VPS) {
                         PrintVpsData($a[0]);
-                     } elsif ($a[1] & Video::Capture::ZVBI::VBI_SLICED_WSS_625) {
+                     } elsif ($a[1] & VBI_SLICED_WSS_625) {
                         my ($w0, $w1, $w2) = unpack("ccc", $a[0]);
                         printf("WSS 0x%02X%02X%02X\n", $w0, $w1, $w2);
                      }
@@ -559,11 +558,11 @@ sub main {
 
                   for (my $idx = 0; $idx < $line_count; $idx++) {
                      my @a = Video::Capture::ZVBI::get_sliced_line($sliced, $idx);
-                     if ($a[1] & Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B) {
+                     if ($a[1] & VBI_SLICED_TELETEXT_B) {
                         PrintTeletextData($a[0], $a[2], $a[1]);
-                     } elsif ($a[1] & Video::Capture::ZVBI::VBI_SLICED_VPS) {
+                     } elsif ($a[1] & VBI_SLICED_VPS) {
                         PrintVpsData($a[0]);
-                     } elsif ($a[1] & Video::Capture::ZVBI::VBI_SLICED_WSS_625) {
+                     } elsif ($a[1] & VBI_SLICED_WSS_625) {
                         my ($w0, $w1, $w2) = unpack("ccc", $a[0]);
                         printf("WSS 0x%02X%02X%02X\n", $w0, $w1, $w2);
                      }

@@ -25,12 +25,13 @@
 # libzvbi #Id: decode.c,v 1.19 2006/10/06 19:23:15 mschimek Exp #
 
 use blib;
-use Video::Capture::ZVBI;
+use strict;
 use Getopt::Long;
 use Switch;
 use POSIX;
 use IO::Handle;
-use strict;
+use Encode;
+use Video::Capture::ZVBI qw(/^VBI_/);
 
 my $source_is_pes       = 0; # ATSC/DVB
 
@@ -80,7 +81,7 @@ sub read_sliced {
         }
 
 	# Time in seconds since last frame.
-        die "invalid timestamp in input\n" unless $buf =~ /^(\d+|(\d*\.\d+))$/;
+        die "invalid timestamp in input\n" unless $buf =~ /^(-?\d+|(-?\d*\.\d+))$/;
 	my $dt = $buf + 0.0;
 	if ($dt < 0.0) {
 		$dt = -$dt;
@@ -109,27 +110,27 @@ sub read_sliced {
 
 		switch ($index) {
 		case 0 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B;
+			$id = VBI_SLICED_TELETEXT_B;
 			$infile->read ($data, 42);
 		}
 		case 1 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_CAPTION_625; 
+			$id = VBI_SLICED_CAPTION_625; 
 			$infile->read ($data, 2);
 		}
 		case 2 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_VPS;
+			$id = VBI_SLICED_VPS;
 			$infile->read ($data, 13);
 		}
 		case 3 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_WSS_625; 
+			$id = VBI_SLICED_WSS_625; 
 			$infile->read ($data, 2);
 		}
 		case 4 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_WSS_CPR1204; 
+			$id = VBI_SLICED_WSS_CPR1204; 
 			$infile->read ($data, 3);
 		}
 		case 7 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_CAPTION_525; 
+			$id = VBI_SLICED_CAPTION_525; 
 			$infile->read($data, 2);
 		}
 		else {
@@ -140,7 +141,7 @@ sub read_sliced {
 
 		die "IO: $!\n" if ($infile->error ());
 
-		push @sliced, [$id, $line, $data];
+		push @sliced, [$data, $id, $line];
 	}
 
 	return ($n_lines, $timestamp, \@sliced);
@@ -170,9 +171,10 @@ sub put_cc_char {
         my ($c1, $c2) = @_;
 
         # All caption characters are representable in UTF-8
-        my $ucs2_str = Video::Capture::ZVBI::caption_unicode ((($c1 << 8) + $c2) & 0x777F); # !to_upper
+        my $c = (($c1 << 8) + $c2) & 0x777F;
+        my $ucs2_str = Video::Capture::ZVBI::caption_unicode ($c);  # !to_upper
 
-        print $ucs_str;
+        print $ucs2_str;
 }
 
 sub caption_command {
@@ -210,10 +212,10 @@ sub caption_command {
                 my $rrrr = $a7 * 2 + (($c2 >> 5) & 1);
 
                 if ($c2 & 0x10) {
-                        printf "PAC $ch=%u row=%u column=%u u=%u\n",
+                        printf "PAC ch=%u row=%u column=%u u=%u\n",
                                 $ch, $row[$rrrr], $b7 * 4, $u;
                 } else {
-                        printf "PAC $ch=%u row=%u color=%u u=%u\n",
+                        printf "PAC ch=%u row=%u color=%u u=%u\n",
                                 $ch, $row[$rrrr], $b7, $u;
                 }
                 return;
@@ -231,29 +233,29 @@ sub caption_command {
                                 "BMO", "BMS", "BAO", "BAS"
                         );
 
-                        printf "%s $ch=%u\n", $mnemo_1[$c2 & 0xF], $ch;
+                        printf "%s ch=%u\n", $mnemo_1[$c2 & 0xF], $ch;
                         return;
                 }
         }
         case 1 {
                 if ($c2 < 0x30) {
-                        printf "mid-row $ch=%u color=%u u=%u\n", $ch, $b7, $u;
+                        printf "mid-row ch=%u color=%u u=%u\n", $ch, $b7, $u;
                 } else {
-                        printf "special character $ch=%u 0x%02x%02x='",
+                        printf "special character ch=%u 0x%02x%02x='",
                                 $ch, $c1, $c2;
                         put_cc_char ($c1, $c2);
-                        print "'";
+                        print "'\n";
                 }
 
                 return;
         }
         case [2,3] { # first & second group
-                printf "extended character $ch=%u 0x%02x%02x='", $ch, $c1, $c2;
+                printf "extended character ch=%u 0x%02x%02x='", $ch, $c1, $c2;
                 put_cc_char ($c1, $c2);
-                print "'";
+                print "'\n";
                 return;
         }
-        case [4,5] { # $f=0,1
+        case [4,5] { # f=0,1
                 if ($c2 < 0x30) {
                         my @mnemo_2 = (
                                 "RCL", "BS",  "AOF", "AON",
@@ -262,7 +264,7 @@ sub caption_command {
                                 "EDM", "CR",  "ENM", "EOC"
                         );
 
-                        printf "%s $ch=%u $f=%u\n", $mnemo_2[$c2 & 0xF], $ch, $f;
+                        printf "%s ch=%u f=%u\n", $mnemo_2[$c2 & 0xF], $ch, $f;
                         return;
                 }
         }
@@ -271,19 +273,19 @@ sub caption_command {
         case 7 {
                 switch ($c2) {
                 case [0x21..0x23] {
-                        printf "TO%u $ch=%u\n", $c2 - 0x20, $ch;
+                        printf "TO%u ch=%u\n", $c2 - 0x20, $ch;
                         return;
                 }
                 case 0x2D {
-                        printf "BT $ch=%u\n", $ch;
+                        printf "BT ch=%u\n", $ch;
                         return;
                 }
                 case 0x2E {
-                        printf "FA $ch=%u\n", $ch;
+                        printf "FA ch=%u\n", $ch;
                         return;
                 }
                 case 0x2F {
-                        printf "FAU $ch=%u\n", $ch;
+                        printf "FAU ch=%u\n", $ch;
                         return;
                 }
                 }
@@ -297,6 +299,7 @@ sub xds_cb {
         my ($xds_class, $xds_subclass, $buffer, $user_data) = @_;
 
         #_vbi_xds_packet_dump (xp, stdout);
+        print "XDS packet callback: class:$xds_class,$xds_subclass\n";
 
         return 1; # no errors
 }
@@ -332,13 +335,14 @@ sub caption {
 
                         # All caption characters are representable
                         # in UTF-8, but not necessarily in ASCII.
-                        $text = $c1;
-                        $text .= $c2 if $c2 != 0;
+                        $text = pack "C2", $c1, $c2;
 
                         # Error ignored.
-                        $text = Video::Capture::ZVBI::iconv_caption ($text, ord("?"));
+                        my $utf = Video::Capture::ZVBI::iconv_caption ($text, ord("?"));
+                        # suppress warnings about wide characters
+                        #$utf = encode("ISO-8859-1", $utf, Encode::FB_DEFAULT);
 
-                        print $text . "'";
+                        print $utf . "'\n";
 
                 } elsif (0 == $c1 || $c1 >= 0x10) {
                         caption_command ($line, $c1, $c2);
@@ -403,7 +407,7 @@ sub dump_bytes {
         Video::Capture::ZVBI::unpar_str ($buffer);
         $buffer =~ s#[\x00-\x1F\x7F]#.#g;
 
-        print ">$buffer<\n";
+        print ">". substr($buffer, 0, $n_bytes) ."<\n";
 }
 
 #if 3 == VBI_VERSION_MINOR # XXX port me back
@@ -492,13 +496,24 @@ sub idl_format_a_cb {
 
         if (!$option_dump_bin) {
                 printf "IDL-A%s%s ",
-                        ($flags & Video::Capture::ZVBI::VBI_IDL_DATA_LOST) ? " <data lost>" : "",
-                        ($flags & Video::Capture::ZVBI::VBI_IDL_DEPENDENT) ? " <dependent>" : "";
+                        ($flags & VBI_IDL_DATA_LOST) ? " <data lost>" : "",
+                        ($flags & VBI_IDL_DEPENDENT) ? " <dependent>" : "";
         }
 
         dump_bytes ($buffer, length $buffer);
 
         return 1;
+}
+
+sub calc_spa {
+        my ($spa_length, @ord) = @_;
+        my $spa = 0;
+
+        for (my $i = 0; $i < $spa_length; ++$i) {
+                my $h = Video::Capture::ZVBI::unham8($ord[4 + $i]);
+                $spa |= ($h << (4 * $i));
+        }
+        return $spa;
 }
 
 sub packet_idl {
@@ -559,12 +574,7 @@ sub packet_idl {
                                 return;
                         }
 
-                        $spa = 0;
-
-                        for (my $i = 0; $i < $spa_length; ++$i) {
-                                my $h = Video::Capture::ZVBI::unham8($ord[4 + $i]);
-                                $spa |= ($h << (4 * $i));
-                        }
+                        $spa = calc_spa($spa_length, @ord);
 
                         if ($spa < 0) {
                                 print "Hamming error in IDL format".
@@ -759,7 +769,7 @@ sub vps {
 #
 #endif # 3 == VBI_VERSION_MINOR
 
-sub decode {
+sub decode_vbi {
         my ($sliced, $n_lines, $sample_time, $stream_time) = @_;
         my $last_sample_time = 0.0;
         my $last_stream_time = 0;
@@ -781,29 +791,29 @@ sub decode {
         }
 
         for (my $i = 0; $i < $n_lines; $i++) {
-                my ($id, $line, $data) = @{$sliced->[$i]};
+                my ($data, $id, $line) = @{$sliced->[$i]};
 
-                if ( ($id == Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B_L10_625) ||
-                     ($id == Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B_L25_625) ||
-                     ($id == Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B_625) ) {
+                if ( ($id == VBI_SLICED_TELETEXT_B_L10_625) ||
+                     ($id == VBI_SLICED_TELETEXT_B_L25_625) ||
+                     ($id == VBI_SLICED_TELETEXT_B_625) ) {
                         teletext ($data, $line);
 
-                } elsif ( ($id == Video::Capture::ZVBI::VBI_SLICED_VPS) ||
-                         ($id == Video::Capture::ZVBI::VBI_SLICED_VPS_F2) ) {
+                } elsif ( ($id == VBI_SLICED_VPS) ||
+                         ($id == VBI_SLICED_VPS_F2) ) {
                         vps ($data, $line);
 
-                } elsif ( ($id == Video::Capture::ZVBI::VBI_SLICED_CAPTION_625_F1) ||
-                          ($id == Video::Capture::ZVBI::VBI_SLICED_CAPTION_625_F2) ||
-                          ($id == Video::Capture::ZVBI::VBI_SLICED_CAPTION_625) ||
-                          ($id == Video::Capture::ZVBI::VBI_SLICED_CAPTION_525_F1) ||
-                          ($id == Video::Capture::ZVBI::VBI_SLICED_CAPTION_525_F2) ||
-                          ($id == Video::Capture::ZVBI::VBI_SLICED_CAPTION_525) ) {
+                } elsif ( ($id == VBI_SLICED_CAPTION_625_F1) ||
+                          ($id == VBI_SLICED_CAPTION_625_F2) ||
+                          ($id == VBI_SLICED_CAPTION_625) ||
+                          ($id == VBI_SLICED_CAPTION_525_F1) ||
+                          ($id == VBI_SLICED_CAPTION_525_F2) ||
+                          ($id == VBI_SLICED_CAPTION_525) ) {
                         caption ($data, $line);
 
-                } elsif ($id == Video::Capture::ZVBI::VBI_SLICED_WSS_625) {
+                } elsif ($id == VBI_SLICED_WSS_625) {
                         #3 wss_625 ($data);
 
-                } elsif ($id == Video::Capture::ZVBI::VBI_SLICED_WSS_CPR1204) {
+                } elsif ($id == VBI_SLICED_WSS_CPR1204) {
                 }
         }
 }
@@ -811,21 +821,26 @@ sub decode {
 sub pes_mainloop {
         my $buffer;
         my $left;
+        my $sliced_buf;  # must be outside of the read() loop!
+        my $n_lines;
+        my $pts;
 
-        while (($left = sysread (STDIN, $buffer, 2048)) == 2048) {
-
+        while (read (STDIN, $buffer, 2048)) {
+                $left = length $buffer;
                 while ($left > 0) {
-                        my $sliced_buf;
-                        my $pts;
-
-                        my $n_lines = $dvb->cor ($sliced_buf, 64, $pts, $buffer, $left);
+                        $n_lines = $dvb->cor ($sliced_buf, 64, $pts, $buffer, $left);
                         if ($n_lines > 0) {
+                                # pull all data lines out of the packed slicer buffer
+                                # since we want to process them by Perl code
+                                # (something we'd normally like to avoid, as it's slow)
+                                # (see export.pl for an efficient use case)
                                 my @sliced = ();
                                 foreach (0 .. $n_lines-1) {
-                                        push @sliced,
+                                        my $x =
                                              [Video::Capture::ZVBI::get_sliced_line($sliced_buf, $_)];
+                                        push @sliced, $x;
                                 }
-                                decode (\@sliced, $n_lines,
+                                decode_vbi (\@sliced, $n_lines,
                                         0, # sample_time
                                         $pts); # stream_time
                         }
@@ -840,7 +855,7 @@ sub old_mainloop {
                 my ($n_lines, $timestamp, $sliced) = read_sliced();
                 last if !defined $n_lines;
 
-                decode ($sliced, $n_lines, $timestamp, 0);
+                decode_vbi ($sliced, $n_lines, $timestamp, 0);
         }
 
         print STDERR "\rEnd of stream\n";
@@ -986,8 +1001,8 @@ sub main_func {
         undef $xds;
 }
 
-sub vlog  { print "\n\n\n\n\n\n\nLOG ".join(",",@_); }
-Video::Capture::ZVBI::set_log_fn(Video::Capture::ZVBI::VBI_LOG_DEBUG, \&vlog, "\n");
+#sub vlog  { print "LOG ".join(",",@_); }
+#Video::Capture::ZVBI::set_log_fn(VBI_LOG_DEBUG, \&vlog, "\n");
 
 main_func();
 

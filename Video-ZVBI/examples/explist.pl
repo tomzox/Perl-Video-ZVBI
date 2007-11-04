@@ -24,23 +24,24 @@
 # libzvbi #Id: explist.c,v 1.10 2006/02/10 06:25:38 mschimek Exp #
 
 use blib;
-use Video::Capture::ZVBI;
+use Video::Capture::ZVBI qw(/^VBI_/);
 use Getopt::Std;
 use strict;
 
 my $check = 0;
 
-my %TypeStr = (Video::Capture::ZVBI::VBI_OPTION_BOOL => "VBI_OPTION_BOOL",
-               Video::Capture::ZVBI::VBI_OPTION_INT => "VBI_OPTION_INT",
-               Video::Capture::ZVBI::VBI_OPTION_REAL => "VBI_OPTION_REAL",
-               Video::Capture::ZVBI::VBI_OPTION_STRING => "VBI_OPTION_STRING",
-               Video::Capture::ZVBI::VBI_OPTION_MENU => "VBI_OPTION_MENU");
+my %TypeStr = (&VBI_OPTION_BOOL => "VBI_OPTION_BOOL",
+               &VBI_OPTION_INT => "VBI_OPTION_INT",
+               &VBI_OPTION_REAL => "VBI_OPTION_REAL",
+               &VBI_OPTION_STRING => "VBI_OPTION_STRING",
+               &VBI_OPTION_MENU => "VBI_OPTION_MENU");
+# (syntax note: "&" is required here to avoid auto-quoting of the bareword before "=>")
 
-sub INT_TYPE { return ($_[0]->{type} == Video::Capture::ZVBI::VBI_OPTION_BOOL) ||
-                      ($_[0]->{type} == Video::Capture::ZVBI::VBI_OPTION_INT) ||
-                      ($_[0]->{type} == Video::Capture::ZVBI::VBI_OPTION_MENU); }
+sub INT_TYPE { return ($_[0]->{type} == VBI_OPTION_BOOL) ||
+                      ($_[0]->{type} == VBI_OPTION_INT) ||
+                      ($_[0]->{type} == VBI_OPTION_MENU); }
 
-sub REAL_TYPE { return ($_[0]->{type} == Video::Capture::ZVBI::VBI_OPTION_REAL); }
+sub REAL_TYPE { return ($_[0]->{type} == VBI_OPTION_REAL); }
 
 sub MENU_TYPE { return defined($_[0]->{menu}); }
 
@@ -217,8 +218,8 @@ sub test_set_entry {
 
         die if ($r0 == 1 || $r0 == 2 || $r1 == 1 || $r1 == 2);
 
-        if (($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_BOOL) ||
-            ($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_INT)) {
+        if (($oi->{type} == VBI_OPTION_BOOL) ||
+            ($oi->{type} == VBI_OPTION_INT)) {
                 if (defined $oi->{menu}) {
                         die unless ($new_current == $oi->{menu}[$new_entry]);
                 } else {
@@ -227,7 +228,7 @@ sub test_set_entry {
                 $current = $new_current;
                 print_current($oi, $new_current);
 
-        } elsif ($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_REAL) {
+        } elsif ($oi->{type} == VBI_OPTION_REAL) {
                 if (defined $oi->{menu}) {
                         # XXX unsafe
                         die unless ($new_current == $oi->{menu}[$new_entry]);
@@ -237,7 +238,7 @@ sub test_set_entry {
                 $current = $new_current;
                 print_current($oi, $new_current);
 
-        } elsif ($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_MENU) {
+        } elsif ($oi->{type} == VBI_OPTION_MENU) {
                 $current = $new_current;
                 print_current($oi, $new_current);
 
@@ -264,8 +265,8 @@ sub dump_option_info {
 
         keyword_check($oi->{keyword});
 
-        if (($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_BOOL) ||
-            ($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_INT)) {
+        if (($oi->{type} == VBI_OPTION_BOOL) ||
+            ($oi->{type} == VBI_OPTION_INT)) {
                 BOUNDS_CHECK($oi);
                 if (defined $oi->{menu}) {
                         printf("    %d menu entries, default=%d: ",
@@ -302,7 +303,7 @@ sub dump_option_info {
                         }
                 }
 
-        } elsif ($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_REAL) {
+        } elsif ($oi->{type} == VBI_OPTION_REAL) {
                 BOUNDS_CHECK($oi);
                 if (defined $oi->{menu}) {
                         printf("    %d menu entries, default=%d: ",
@@ -337,7 +338,7 @@ sub dump_option_info {
                         }
                 }
 
-        } elsif ($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_STRING) {
+        } elsif ($oi->{type} == VBI_OPTION_STRING) {
                 if ($oi->{menu}) {
                         STRING_CHECK($oi);
                         printf("    %d menu entries, default=%d: ",
@@ -364,7 +365,7 @@ sub dump_option_info {
                         printf("    current value=\"%s\"\n", $val);
                 }
 
-        } elsif ($oi->{type} == Video::Capture::ZVBI::VBI_OPTION_MENU) {
+        } elsif ($oi->{type} == VBI_OPTION_MENU) {
                 printf("    %d menu entries, default=%d: ",
                        $oi->{max} - $oi->{min} + 1, $oi->{def});
                 for ($i = $oi->{min}; $i <= $oi->{max}; $i++) {
@@ -451,3 +452,4 @@ sub main_func {
 }
 
 main_func();
+

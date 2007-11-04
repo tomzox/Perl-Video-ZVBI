@@ -46,6 +46,36 @@ Video::Capture::ZVBI - VBI decoding (teletext, closed caption, ...)
 =head1 SYNOPSIS
 
    use Video::Capture::ZVBI;
+   use Video::Capture::ZVBI qw(/^VBI_/);
+
+=head1 DESCRIPTION
+
+This module provides a Perl interface to B<libzvbi>.  The ZVBI library
+allows to access broadcast data services such as teletext or
+closed caption via analog video or DVB capture devices.
+
+Official library description:
+"The ZVBI library provides routines to access raw VBI sampling devices
+(currently the Linux V4L and and V4L2 API and the FreeBSD, OpenBSD,
+NetBSD and BSDi bktr driver API are supported), a versatile raw VBI
+bit slicer, decoders for various data services and basic search, render
+and export functions for text pages. The library was written for the
+Zapping TV viewer and Zapzilla Teletext browser."
+
+The ZVBI Perl module covers all exported libzvbi functions.  Most of
+the functions and parameters are exposed nearly identical, or with
+minor adaptions for the Perl idiom.
+
+Note: This manual page does not reproduce the full documentation
+which is available along with libzvbi. Hence it's recommended that
+you use the libzvbi documentation in parallel to this one. It is
+included in the libzvbi-dev package in the C<doc/html> sub-directory
+and online at L<http://zapping.sourceforge.net/doc/libzvbi/index.html>
+
+Finally note there's also another, older, module which covers VBI
+data capture: B<Video::Capture::VBI> and based on that another one which
+covers Teletext caching: B<Video::TeletextDB>. Check for yourself which
+one fits your needs better.
 
 =head1 Video::Capture::ZVBI::capture
 
@@ -162,9 +192,9 @@ when the function fails.
 =back
 
 The following functions are used to read raw and sliced VBI data from
-an previously created capture context (which is implicitly inserted as
-first parameter when the functions are invoked as listed below.)
-All these functions return a status result code: -1 on error
+a previously created capture context I<$cap> (the reference is implicitly
+inserted as first parameter when the functions are invoked as listed
+below.) All these functions return a status result code: -1 on error
 (and an error indicator in C<$!>), 0 on timeout (i.e. no data arrived
 within I<$timeout_ms> milliseconds) or 1 on success.
 
@@ -172,10 +202,10 @@ There are two different types of capture functions: The functions
 named C<read...> copy captured data into the given Perl scalar. In
 contrast the functions named C<pull...> leave the data in internal
 buffers inside the capture context and just return a blessed reference
-to this buffer. When you need to access the captured data via Perl,
-choose the read functions. When you use functions of this module for
-further decoding, you should use the pull functions since these are
-usually more efficient.
+to this buffer. When you need to access the captured data directly
+via Perl, choose the read functions. When you use functions of this
+module for further decoding, you should use the pull functions since
+these are usually more efficient.
 
 =over 4
 
@@ -262,7 +292,7 @@ see above.
 
 For reasons of efficiency the data is not immediately converted into
 Perl structures. Functions of the "read" variety return a single
-binary string in the given scalar which contains all VBI lines.
+byte-string in the given scalar which contains all VBI lines.
 Functions of the "pull" variety just return a binary reference
 (i.e. a C pointer) which cannot be used by Perl for other purposes
 than passing it to further processing functions.  To process either
@@ -330,8 +360,16 @@ creation.
 =item $cap->fd()
 
 This function returns the file descriptor used to read from the
-capture context's device. If not applicable (e.g. when using the proxy)
-or upon internal errors the function returns -1.
+capture context's device.  Note when using the proxy this will not
+be the actual device, but a socket instead.  Some devices may also
+return -1 if they don't have anything similar, or upon internal errors.
+
+The descriptor is intended be used for I<select()> by caller. The
+application especially must not read or write from it and must never
+close the handle (call the context close function instead.)
+In other words, the filehandle is intended to allow capturing
+asynchronously in the background: The handle will become readable
+when new data is available.
 
 =item $cap->get_scanning()
 
@@ -358,7 +396,7 @@ support norm queries through VBI devices.
 =item $cap->get_fd_flags()
 
 Returns properties of the capture context's device. The result is an OR
-of one or more C<VBI_FD_*> flags.
+of one or more C<VBI_FD_*> constants.
 
 =item $cap->vbi_capture_dvb_filter($pid)
 
@@ -406,10 +444,12 @@ used to enable output of progress messages on I<stderr>.
 
 =item $proxy->get_capture_if()
 
-This function is not supported.  (In libzvbi it returns a reference to
-a capture context created from the proxy context via I<$proxy-E<gt>proxy_new()>;
-you should just store the reference returned by that function instead of
-using this interface.)
+This function is not supported as it does not make sense.  In libzvbi the
+function returns a reference to a capture context created from the proxy
+context via I<$proxy-E<gt>proxy_new()>.  In Perl, you must keep the
+reference anyway, because otherwise the capture context would be
+automatically closed and destroyed.  So you can just use the stored
+reference instead of using this function.
 
 =item $proxy->set_callback(\&callback [, $user_data])
 
@@ -706,7 +746,9 @@ Usually the function will be called in a loop:
   }
 
 Input parameters: I<$buf> contains data read from a DVB device (needs
-not align with packet boundaries.)
+not align with packet boundaries.)  Note you must not modify the buffer
+until all data is processed as indicated by I<$buf_left> being zero
+(unless you remove processed data and reset the left count to zero.)
 I<$buffer_left> specifies the number of unprocessed bytes (at the end
 of the buffer.)  This value is decremented in each call by the number
 of processed bytes. Note the packet filter works faster with larger
@@ -1143,12 +1185,12 @@ teletext characters respectively.
 Note this function is just a convienence interface to
 I<$pg-E<gt>draw_vt_page_region()> which automatically inserts the
 page column, row, width and height parameters by querying page dimensions.
-The rowstride is set to the page width (i.e. same as when passing -1 for
-I<$rowstride>)
+The image width is set to the full page width (i.e. same as when passing
+value -1 for I<$img_pix_width>)
 
 See the following function for descriptions of the remaining parameters.
 
-=item $pg->draw_vt_page_region($fmt, $canvas, $rowstride, $col_pix_off, $row_pix_off, $column, $row, $width, $height, $reveal=0, $flash_on=0)
+=item $pg->draw_vt_page_region($fmt, $canvas, $img_pix_width, $col_pix_off, $row_pix_off, $column, $row, $width, $height, $reveal=0, $flash_on=0)
 
 Draw a sub-section of a Teletext page. Each character occupies 12 x 10 pixels
 (i.e. a character is 12 pixels wide and each lins is 10 pixels high.)
@@ -1156,21 +1198,23 @@ Draw a sub-section of a Teletext page. Each character occupies 12 x 10 pixels
 The image is written into I<$canvas>. If the scalar is undefined or not
 large enough to hold the output image, the canvas is initialized as black.
 Else it's left as is. This allows to call the draw functions multiple times
-to assemble an image. In this case I<$rowstride> must have the same value
-in all rendering calls. See also I<$pg-E<gt>draw_blank()>.
+to assemble an image. In this case I<$img_pix_width> must have the same
+value in all rendering calls. See also I<$pg-E<gt>draw_blank()>.
 
-The image is returned in a scalar which contains a byte string.  Each
-pixel uses 4 subsequent bytes in the string (RGBA). Hence the string
-is at least C<$rowstride * ($row_pix_off + 10 * $height)> bytes long.
+The image is returned in a scalar which contains a byte string.  With
+format C<VBI_PIXFMT_RGBA32_LE> each pixel uses 4 subsequent bytes in the
+string (RGBA). With format C<VBI_PIXFMT_PAL8> (only available with libzvbi
+version 0.2.26 or later) each pixel uses one byte (reference into the
+color palette.)
 
 Input parameters:
 I<$fmt> is the target format. Currently only C<VBI_PIXFMT_RGBA32_LE>
 is supported (i.e. each pixel uses 4 subsequent bytes for R,G,B,A.)
 I<$canvas> is a scalar into which the image is written.
 
-I<$rowstride> is the distance between canvas pixel lines B<in bytes>.
-When set to -1, the row stride is automatically set to the width of
-the selected region (i.e. C<4 * $pg_columns * 12> bytes.)
+I<$img_pix_width> is the distance between canvas pixel lines in pixels.
+When set to -1, the image width is automatically set to the width of
+the selected region (i.e. C<$pg_columns * 12> bytes.)
 
 I<$col_pix_off> and I<$row_pix_off> are offsets to the upper left
 corner in pixels and define where in the canvas to draw the page
@@ -1212,17 +1256,17 @@ Closed Caption characters respectively.
 Note this function is just a convienence interface to
 I<$pg-E<gt>draw_cc_page_region()> which automatically inserts the
 page column, row, width and height parameters by querying page dimensions.
-The rowstride is set to the page width (i.e. same as when passing -1 for
-I<$rowstride>)
+The image width is set to the page width (i.e. same as when passing
+value -1 for I<$img_pix_width>)
 
-=item $pg->draw_cc_page_region($fmt, $canvas, $rowstride, $column, $row, $width, $height)
+=item $pg->draw_cc_page_region($fmt, $canvas, $img_pix_width, $column, $row, $width, $height)
 
 Draw a sub-section of a Closed Caption page. Please refer to
 I<$pg-E<gt>draw_cc_page()> and
 I<$pg-E<gt>draw_vt_page_region()> for details on parameters
 and the format of the returned byte string.
 
-=item $canvas = $pg->draw_blank($fmt, $pix_height, $rowstride)
+=item $canvas = $pg->draw_blank($fmt, $pix_height, $img_pix_width)
 
 This function can be used to create a blank canvas onto which several
 Teletext or Closed Caption regions can be drawn later.
@@ -1230,27 +1274,29 @@ Teletext or Closed Caption regions can be drawn later.
 All input parameters are optional:
 I<$fmt> is the target format. Currently only C<VBI_PIXFMT_RGBA32_LE>
 is supported (i.e. each pixel uses 4 subsequent bytes for R,G,B,A.)
-I<$rowstride> is the distance between canvas pixel lines B<in bytes>.
+I<$img_pix_width> is the distance between canvas pixel lines in pixels.
 I<$pix_height> is the height of the canvas in pixels (note each
 Teletext line has 10 pixels and each Closed Caption line 26 pixels
 when using the above drawing functions.)
 When omitted, the previous two parameters are derived from the
 referenced page object.
 
-=item $xpm = $pg->rgba_to_xpm($canvas, $rowstride=-1, $pix_width=0)
+=item $xpm = $pg->canvas_to_xpm($canvas [, $fmt, $aspect, $img_pix_width])
 
 This is a helper function which converts the image given in
-I<$canvas> from a RGBA byte string into XPM format. Due to the way
-XPM3 is specified, the output is a regular text string. (The result
+I<$canvas> from a raw byte string into XPM format. Due to the way
+XPM is specified, the output is a regular text string. (The result
 is suitable as input to B<Tk::Pixmap> but can also be written into
 a file for passing the image to external applications.)
 
-Parameters I<$rowstride> must have the same value as used when
-drawing the image. If this parameter is omitted or -1, it is
-calculated from the given I<$pix_width> parameter, which is otherwise
-unused. If the width is also omitted, the referred object's full
-width is used (which is suitable for use with I<draw_vt_page()>
-or I<draw_cc_page()>.)
+Optional boolean parameter I<$aspect> when set to 0, disables the
+aspect ration correction (i.e. on teletext pages all lines are
+doubled by default; closed caption output ration is already correct.)
+Optional parameter I<$img_pix_width> if present, must have the same
+value as used when drawing the image. If this parameter is omitted
+or set to -1, the referenced page's full width is assumed (which is
+suitable for converting images generated by I<draw_vt_page()> or
+I<draw_cc_page()>.)
 
 =item $txt = $pg->print_page($table=0, $rtl=0)
 
@@ -1917,6 +1963,15 @@ Captures sliced VBI data from a device.  Output can be written to a
 file or passed via stdout into one of the following example scripts.
 Call with option C<--help> for a list of options.
 
+=item decode.pl
+
+This is a direct translation of C<test/decode.c> in the libzvbi package.
+Decodes sliced VBI data on stdin, e. g.
+
+  ./capture --sliced | ./decode --ttx
+
+Call with option C<--help> for a list of options.
+
 =item caption.pl
 
 This is a translation of C<test/caption.c> in the libzvbi package,
@@ -1927,15 +1982,6 @@ When the input stream is the output of C<capture.pl --sliced>
 (see above), the applications displays the live CC stream received
 from a VBI device.  The buttons on top switch between Closed Caption
 channels 1-4 and Text channels 1-4.
-
-=item decode.pl
-
-This is a direct translation of C<test/decode.c> in the libzvbi package.
-Decodes sliced VBI data on stdin, e. g.
-
-  ./capture --sliced | ./decode --ttx
-
-Call with option C<--help> for a list of options.
 
 =item export.pl
 
@@ -1965,8 +2011,8 @@ identified by means of VPS, PDC et.al.
 This is a direct translation of C<test/proxy-test.c> in the libzvbi package.
 The script can capture either from a proxy daemon or a local device and
 dumps captured data on the terminal. Also allows changing services and
-channels during capturing. Start with option C<-help> for a list of
-supported command line options.
+channels during capturing (e.g. by entering "+ttx" or "-ttx" on stdin.)
+Start with option C<-help> for a list of supported command line options.
 
 =item test-vps.pl
 
@@ -1997,8 +2043,8 @@ L<http://nxtvepg.sourceforge.net/>
 
 The module is based on the libzvbi library, mainly written and maintained
 by Michael H. Schimek (2000-2007) and Iñaki García Etxebarria (2000-2001),
-which in turn is based on AleVT 1.5.1 by Edgar Toernig (1998-1999)
-
+which in turn is based on AleVT 1.5.1 by Edgar Toernig (1998-1999).
+See also L<http://zapping.sourceforge.net/>
 
 =head1 COPYING
 

@@ -27,8 +27,8 @@
 
 #define LIBZVBI_VERSION(A,B,C) \
    ((VBI_VERSION_MAJOR>(A)) || \
-    (VBI_VERSION_MINOR>(B)) || \
-    (VBI_VERSION_MICRO >= (C)))
+    ((VBI_VERSION_MAJOR==(A)) && (VBI_VERSION_MINOR>(B))) || \
+    ((VBI_VERSION_MAJOR==(A)) && (VBI_VERSION_MINOR==(B)) && (VBI_VERSION_MICRO>=(C))))
 
 typedef vbi_proxy_client VbiProxyObj;
 typedef vbi_capture VbiCaptureObj;
@@ -75,6 +75,11 @@ typedef struct vbi_xds_demux_obj_struct {
 #define DRAW_TTX_CELL_HEIGHT    10
 #define DRAW_CC_CELL_WIDTH      16
 #define DRAW_CC_CELL_HEIGHT     26
+#if LIBZVBI_VERSION(0,2,26)
+#define GET_CANVAS_TYPE(FMT)    (((FMT)==VBI_PIXFMT_PAL8) ? sizeof(uint8_t) : sizeof(vbi_rgba))
+#else
+#define GET_CANVAS_TYPE(FMT)    (sizeof(vbi_rgba))
+#endif
 
 #define MY_CXT_KEY "Video::Capture::ZVBI::_statics" XS_VERSION
 #define ZVBI_MAX_CB_COUNT   4
@@ -900,6 +905,177 @@ static void * zvbi_xs_sv_canvas_prep( SV * sv_buf, STRLEN buf_size, vbi_bool bla
         return p_str;
 }
 
+static SV * zvbi_xs_convert_rgba_to_xpm( VbiPageObj * pg_obj, const vbi_rgba * p_img,
+                                         int pix_width, int pix_height, int scale )
+{
+        int idx;
+        HV * hv;
+        char key[20];
+        char code[2];
+        int col_idx;
+        char * p_key;
+        I32 key_len;
+        int row;
+        int col;
+        STRLEN buf_size;
+        SV * sv_xpm;
+        SV * sv_tmp;
+        SV ** p_sv;
+
+        /*
+         * Determine the color palette
+         */
+        hv = newHV();
+        col_idx = 0;
+        for (idx = 0; idx < pix_width * pix_height; idx++) {
+                sprintf(key, "%06X", p_img[idx] & 0xFFFFFF);
+                if (!hv_exists(hv, key, 6)) {
+                        hv_store(hv, key, 6, newSViv(col_idx), 0);
+                        col_idx += 1;
+                }
+        }
+
+        switch (scale) {
+                case 0: pix_height /= 2; break;
+                case 2: pix_height *= 2; break;
+                default: break;
+        }
+
+        /*
+         * Write the image header (including image dimensions)
+         */
+        sv_xpm = newSVpvf("/* XPM */\n"
+                          "static char *image[] = {\n"
+                          "/* width height ncolors chars_per_pixel */\n"
+                          "\"%d %d %d %d\",\n"
+                          "/* colors */\n",
+                          pix_width, pix_height, col_idx, 1);
+
+        /* pre-extend the string to avoid re-alloc */
+        (void *) SvPV(sv_xpm, buf_size);
+        buf_size += col_idx * 15 + 13 + pix_height * (pix_width + 4) + 3;
+        SvGROW(sv_xpm, buf_size + 1);
+
+        /*
+         * Write the color palette
+         */
+        hv_iterinit(hv);
+        while ((sv_tmp = hv_iternextsv(hv, &p_key, &key_len)) != NULL) {
+                int cval;
+                sscanf(p_key, "%X", &cval);
+                sv_catpvf(sv_xpm, "\"%c c #%02X%02X%02X\",\n",
+                                  '0' + SvIV(sv_tmp),
+                                  cval & 0xFF,
+                                  (cval >> 8) & 0xFF,
+                                  (cval >> 16) & 0xFF);
+        }
+
+        /*
+         * Write the image row by row
+         */
+        sv_catpv(sv_xpm, "/* pixels */\n");
+        code[1] = 0;
+        for (row = 0; row < pix_height; row++) {
+                sv_catpv(sv_xpm, "\"");
+                for (col = 0; col < pix_width; col++) {
+                        sprintf(key, "%06X", *(p_img++) & 0xFFFFFF);
+                        p_sv = hv_fetch(hv, key, 6, 0);
+                        if (p_sv != NULL) {
+                                code[0] = '0' + SvIV(*p_sv);
+                        } else {
+                                code[0] = 0;  /* should never happen */
+                        }
+                        sv_catpvn(sv_xpm, code, 1);
+                }
+                sv_catpv(sv_xpm, "\",\n");
+
+                if (scale == 0) {
+                        p_img += pix_width;
+                } else if ((scale == 2) && ((row & 1) == 0)) {
+                        p_img -= pix_width;
+                }
+        }
+        sv_catpv(sv_xpm, "};\n");
+        SvREFCNT_dec(hv);
+
+        return sv_xpm;
+
+}
+
+static SV * zvbi_xs_convert_pal8_to_xpm( VbiPageObj * pg_obj, const uint8_t * p_img,
+                                         int pix_width, int pix_height, int scale )
+{
+#if LIBZVBI_VERSION(0,2,26)
+        int idx;
+        int row;
+        int col;
+        STRLEN buf_size;
+        SV * sv_xpm;
+        static const uint8_t col_codes[40] = " 1234567ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef";
+
+        switch (scale) {
+                case 0: pix_height /= 2; break;
+                case 2: pix_height *= 2; break;
+                default: break;
+        }
+
+        /*
+         * Write the image header (including image dimensions)
+         */
+        sv_xpm = newSVpvf("/* XPM */\n"
+                          "static char *image[] = {\n"
+                          "/* width height ncolors chars_per_pixel */\n"
+                          "\"%d %d %d %d\",\n"
+                          "/* colors */\n",
+                          pix_width, pix_height, 40, 1);
+
+        /* pre-extend the string to avoid re-alloc */
+        (void *) SvPV(sv_xpm, buf_size);
+        buf_size += 40 * 15 + 13 + pix_height * (pix_width + 4) + 3;
+        SvGROW(sv_xpm, buf_size + 1);
+
+        /*
+         * Write the color palette (always the complete palette, including unused colors)
+         */
+        for (idx = 0; idx < 40; idx++) {
+                sv_catpvf(sv_xpm, "\"%c c #%02X%02X%02X\",\n",
+                                  col_codes[idx],
+                                  pg_obj->p_pg->color_map[idx] & 0xFF,
+                                  (pg_obj->p_pg->color_map[idx] >> 8) & 0xFF,
+                                  (pg_obj->p_pg->color_map[idx] >> 16) & 0xFF);
+        }
+
+        /*
+         * Write the image row by row
+         */
+        sv_catpv(sv_xpm, "/* pixels */\n");
+        for (row = 0; row < pix_height; row++) {
+                sv_catpv(sv_xpm, "\"");
+                for (col = 0; col < pix_width; col++) {
+                        uint8_t c = *(p_img++);
+                        if (c < 40) {
+                                sv_catpvn(sv_xpm, col_codes + c, 1);
+                        } else {
+                                sv_catpvn(sv_xpm, " ", 1);  /* invalid input, i.e. not PAL8 */
+                        }
+                }
+                sv_catpv(sv_xpm, "\",\n");
+
+                if (scale == 0) {
+                        p_img += pix_width;
+                } else if ((scale == 2) && ((row & 1) == 0)) {
+                        p_img -= pix_width;
+                }
+        }
+        sv_catpv(sv_xpm, "};\n");
+
+        return sv_xpm;
+#else /* version >= 0.2.26 */
+        croak ("only RGBA convas formats are supported prior to libzvbi 0.2.26");
+        return NULL;
+#endif /* version >= 0.2.26 */
+}
+
 MODULE = Video::Capture::ZVBI	PACKAGE = Video::Capture::ZVBI::proxy	PREFIX = vbi_proxy_client_
 
 PROTOTYPES: ENABLE
@@ -1619,7 +1795,7 @@ vbi_dvb_demux_cor(dx, sv_sliced, sliced_lines, pts, sv_buf, buf_left)
         CODE:
         if (SvOK(sv_buf)) {
                 p_buf = (void *) SvPV(sv_buf, buf_size);
-                if (buf_size > buf_left) {
+                if (buf_left <= buf_size) {
                         p_buf += buf_size - buf_left;
 
                         size_sliced = sliced_lines * sizeof(vbi_sliced);
@@ -1628,6 +1804,7 @@ vbi_dvb_demux_cor(dx, sv_sliced, sliced_lines, pts, sv_buf, buf_left)
                         RETVAL = vbi_dvb_demux_cor(dx->ctx, p_sliced, sliced_lines, &pts,
                                                    &p_buf, &buf_left);
                 } else {
+                        croak("Input buffer size %d is less than left count %d", buf_size, buf_left);
                         RETVAL = 0;
                 }
         } else {
@@ -2181,25 +2358,27 @@ draw_vt_page(pg_obj, fmt=VBI_PIXFMT_RGBA32_LE, reveal=0, flash_on=0)
         int flash_on
         PREINIT:
         int canvas_size;
+        int canvas_type;
         char * p_buf;
         int rowstride;
         CODE:
         RETVAL = newSVpvn("", 0);
-        rowstride = pg_obj->p_pg->columns * DRAW_TTX_CELL_WIDTH * sizeof(vbi_rgba);
+        canvas_type = GET_CANVAS_TYPE(fmt);  /* prior to 0.2.26 only RGBA is supported */
+        rowstride = pg_obj->p_pg->columns * DRAW_TTX_CELL_WIDTH * canvas_type;
         canvas_size = rowstride * pg_obj->p_pg->rows * DRAW_TTX_CELL_HEIGHT;
         p_buf = zvbi_xs_sv_canvas_prep(RETVAL, canvas_size, 1);
-        memset(p_buf, 0, canvas_size);
-        vbi_draw_vt_page_region(pg_obj->p_pg, fmt, p_buf, rowstride, 0, 0,
-                                pg_obj->p_pg->columns, pg_obj->p_pg->rows, reveal, flash_on);
+        vbi_draw_vt_page_region(pg_obj->p_pg, fmt, p_buf, rowstride,
+                                0, 0, pg_obj->p_pg->columns, pg_obj->p_pg->rows,
+                                reveal, flash_on);
         OUTPUT:
         RETVAL
 
 void
-draw_vt_page_region(pg_obj, fmt, canvas, rowstride, col_pix_off, row_pix_off, column, row, width, height, reveal=0, flash_on=0)
+draw_vt_page_region(pg_obj, fmt, canvas, img_pix_width, col_pix_off, row_pix_off, column, row, width, height, reveal=0, flash_on=0)
         VbiPageObj * pg_obj
         vbi_pixfmt fmt
         SV * canvas
-        int rowstride
+        int img_pix_width
         int col_pix_off
         int row_pix_off
         int column
@@ -2210,26 +2389,28 @@ draw_vt_page_region(pg_obj, fmt, canvas, rowstride, col_pix_off, row_pix_off, co
         int flash_on
         PREINIT:
         int canvas_size;
+        int canvas_type;
         char * p_buf;
         CODE:
-        if (rowstride < 0) {
-                rowstride = pg_obj->p_pg->columns * DRAW_TTX_CELL_WIDTH * sizeof(vbi_rgba);
+        if (img_pix_width < 0) {
+                img_pix_width = pg_obj->p_pg->columns * DRAW_TTX_CELL_WIDTH;
         }
         if ((width > 0) && (height > 0) &&
             (column + width <= pg_obj->p_pg->columns) &&
             (row + height <= pg_obj->p_pg->rows) &&
             (col_pix_off >= 0) && (row_pix_off >= 0) &&
-            (rowstride >= (col_pix_off + (width * DRAW_TTX_CELL_WIDTH) * sizeof(vbi_rgba)))) {
+            (img_pix_width >= (col_pix_off + (width * DRAW_TTX_CELL_WIDTH)))) {
 
-                canvas_size = rowstride * (row_pix_off + height * DRAW_TTX_CELL_HEIGHT);
+                canvas_type = GET_CANVAS_TYPE(fmt);  /* prior to 0.2.26 only RGBA is supported */
+                canvas_size = img_pix_width * (row_pix_off + height * DRAW_TTX_CELL_HEIGHT) * canvas_type;
                 p_buf = zvbi_xs_sv_canvas_prep(canvas, canvas_size, 0);
                 vbi_draw_vt_page_region(pg_obj->p_pg, fmt,
-                                        p_buf + (row_pix_off * rowstride) + col_pix_off,
-                                        rowstride,
+                                        p_buf + (row_pix_off * img_pix_width * canvas_type) + col_pix_off,
+                                        img_pix_width * canvas_type,
                                         column, row, width, height, reveal, flash_on);
         } else {
-                croak("invalid width %d or height %d for rowstride %d and page geometry %dx%d",
-                      width, height, rowstride, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
+                croak("invalid width %d or height %d for image width %d and page geometry %dx%d",
+                      width, height, img_pix_width, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
         }
         OUTPUT:
         canvas
@@ -2240,43 +2421,51 @@ draw_cc_page(pg_obj, fmt=VBI_PIXFMT_RGBA32_LE)
         vbi_pixfmt fmt
         PREINIT:
         int canvas_size;
+        int canvas_type;
+        int rowstride;
         char * p_buf;
         CODE:
         RETVAL = newSVpvn("", 0);
-        canvas_size = (pg_obj->p_pg->columns * DRAW_CC_CELL_WIDTH * sizeof(vbi_rgba))
-                        * pg_obj->p_pg->rows * DRAW_CC_CELL_HEIGHT;
+        canvas_type = GET_CANVAS_TYPE(fmt);  /* prior to 0.2.26 only RGBA is supported */
+        rowstride = pg_obj->p_pg->columns * DRAW_CC_CELL_WIDTH * canvas_type;
+        canvas_size = rowstride * pg_obj->p_pg->rows * DRAW_CC_CELL_HEIGHT;
         p_buf = zvbi_xs_sv_canvas_prep(RETVAL, canvas_size, 1);
-        vbi_draw_cc_page_region(pg_obj->p_pg, fmt, p_buf, -1, 0, 0, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
+        vbi_draw_cc_page_region(pg_obj->p_pg, fmt, p_buf, rowstride,
+                                0, 0, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
         OUTPUT:
         RETVAL
 
 void
-draw_cc_page_region(pg_obj, fmt, canvas, rowstride, column, row, width, height)
+draw_cc_page_region(pg_obj, fmt, canvas, img_pix_width, column, row, width, height)
         VbiPageObj * pg_obj
         vbi_pixfmt fmt
         SV * canvas
-        int rowstride
+        int img_pix_width
         int column
         int row
         int width
         int height
         PREINIT:
         int canvas_size;
+        int canvas_type;
         char * p_buf;
         CODE:
-        if (rowstride < 0) {
-                rowstride = pg_obj->p_pg->columns * DRAW_CC_CELL_WIDTH * sizeof(vbi_rgba);
+        if (img_pix_width < 0) {
+                img_pix_width = pg_obj->p_pg->columns * DRAW_CC_CELL_WIDTH;
         }
         if ((width > 0) && (height > 0) &&
             (column + width <= pg_obj->p_pg->columns) &&
             (row + height <= pg_obj->p_pg->rows) &&
-            (rowstride >= width * DRAW_CC_CELL_WIDTH * sizeof(vbi_rgba))) {
-                canvas_size = rowstride * height * DRAW_CC_CELL_HEIGHT;
+            (img_pix_width >= width * DRAW_CC_CELL_WIDTH)) {
+
+                canvas_type = GET_CANVAS_TYPE(fmt);  /* prior to 0.2.26 only RGBA is supported */
+                canvas_size = img_pix_width * height * DRAW_CC_CELL_HEIGHT * canvas_type;
                 p_buf = zvbi_xs_sv_canvas_prep(canvas, canvas_size, 0);
-                vbi_draw_cc_page_region(pg_obj->p_pg, fmt, p_buf, rowstride, column, row, width, height);
+                vbi_draw_cc_page_region(pg_obj->p_pg, fmt, p_buf, img_pix_width * canvas_type,
+                                        column, row, width, height);
         } else {
-                croak("invalid width %d or height %d for rowstride %d and page geometry %dx%d",
-                      width, height, rowstride, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
+                croak("invalid width %d or height %d for img_pix_width %d and page geometry %dx%d",
+                      width, height, img_pix_width, pg_obj->p_pg->columns, pg_obj->p_pg->rows);
         }
         OUTPUT:
         canvas
@@ -2320,13 +2509,14 @@ draw_cc_page_region(pg_obj, fmt, canvas, rowstride, column, row, width, height)
         #canvas
 
 SV *
-draw_blank(pg_obj, fmt=VBI_PIXFMT_RGBA32_LE, pix_height=0, rowstride=-1)
+draw_blank(pg_obj, fmt=VBI_PIXFMT_RGBA32_LE, pix_height=0, img_pix_width=-1)
         VbiPageObj * pg_obj
         vbi_pixfmt fmt
         int pix_height
-        int rowstride
+        int img_pix_width
         PREINIT:
         int canvas_size;
+        int canvas_type;
         CODE:
         RETVAL = newSVpvn("", 0);
         if (pix_height <= 0) {
@@ -2336,112 +2526,62 @@ draw_blank(pg_obj, fmt=VBI_PIXFMT_RGBA32_LE, pix_height=0, rowstride=-1)
                         pix_height = pg_obj->p_pg->rows * DRAW_TTX_CELL_HEIGHT;
                 }
         }
-        if (rowstride <= 0) {
+        if (img_pix_width <= 0) {
                 if (pg_obj->p_pg->pgno <= 8) {
-                        rowstride = pg_obj->p_pg->columns * DRAW_CC_CELL_WIDTH * sizeof(vbi_rgba);
+                        img_pix_width = pg_obj->p_pg->columns * DRAW_CC_CELL_WIDTH;
                 } else {
-                        rowstride = pg_obj->p_pg->columns * DRAW_TTX_CELL_WIDTH * sizeof(vbi_rgba);
+                        img_pix_width = pg_obj->p_pg->columns * DRAW_TTX_CELL_WIDTH;
                 }
         }
-        canvas_size = rowstride * pix_height;
+        canvas_type = GET_CANVAS_TYPE(fmt);  /* prior to 0.2.26 only RGBA is supported */
+        canvas_size = img_pix_width * pix_height * canvas_type;
         zvbi_xs_sv_canvas_prep(RETVAL, canvas_size, 1);
         OUTPUT:
         RETVAL
 
 SV *
-rgba_to_xpm(pg_obj, sv_canvas, rowstride=-1, pix_width=0)
+canvas_to_xpm(pg_obj, sv_canvas, fmt=VBI_PIXFMT_RGBA32_LE, aspect=1, img_pix_width=-1)
         VbiPageObj * pg_obj
         SV * sv_canvas
-        int rowstride
-        int pix_width
+        vbi_pixfmt fmt
+        vbi_bool aspect;
+        int img_pix_width
         PREINIT:
-        vbi_rgba * p_img;
+        void * p_img;
         STRLEN buf_size;
-        int pix_height;
-        int idx;
-        HV * hv;
-        char key[20];
-        char code[2];
-        int col_idx;
-        char * p_key;
-        I32 key_len;
-        SV * sv;
-        int row;
-        int col;
+        int canvas_type;
+        int img_pix_height;
+        int scale;
         CODE:
         if (!SvOK(sv_canvas)) {
                 croak("Input buffer is undefined or not a scalar");
                 XSRETURN_UNDEF;
         }
-        p_img = (void *) SvPV(sv_canvas, buf_size);
-        if (rowstride <= 0) {
-                if (pix_width == 0) {
-                        if (pg_obj->p_pg->pgno <= 8) {
-                                rowstride = pg_obj->p_pg->columns * DRAW_CC_CELL_WIDTH * sizeof(vbi_rgba);
-                        } else {
-                                rowstride = pg_obj->p_pg->columns * DRAW_TTX_CELL_WIDTH * sizeof(vbi_rgba);
-                        }
+        p_img = SvPV(sv_canvas, buf_size);
+        if (img_pix_width <= 0) {
+                if (pg_obj->p_pg->pgno <= 8) {
+                        img_pix_width = pg_obj->p_pg->columns * DRAW_CC_CELL_WIDTH;
                 } else {
-                        rowstride = pix_width * sizeof(vbi_rgba);
+                        img_pix_width = pg_obj->p_pg->columns * DRAW_TTX_CELL_WIDTH;
                 }
         }
-        if (buf_size % rowstride != 0) {
-                croak("Input buffer size doesn't match rowstride");
+        if (pg_obj->p_pg->pgno <= 8) {
+                scale = aspect ? 1 : 0;  /* CC: is already line-doubled */
+        } else {
+                scale = aspect ? 2 : 1;  /* TTX: correct aspect ratio by doubling lines in Y dimension */
+        }
+        canvas_type = GET_CANVAS_TYPE(fmt);  /* prior to 0.2.26 only RGBA is supported */
+        if (buf_size % (img_pix_width * canvas_type) != 0) {
+                croak("Input buffer size %d doesn't match img_pix_width %d (pixel size %d)",
+                      buf_size, img_pix_width, canvas_type);
                 XSRETURN_UNDEF;
         }
-        pix_height = buf_size / rowstride;
-        /*
-         * Determine the color palette
-         */
-        hv = newHV();
-        col_idx = 0;
-        for (idx = 0; idx < buf_size / sizeof(vbi_rgba); idx++) {
-                sprintf(key, "%06X", p_img[idx] & 0xFFFFFF);
-                if (!hv_exists(hv, key, 6)) {
-                        hv_store(hv, key, 6, newSViv(col_idx), 0);
-                        col_idx += 1;
-                }
+        img_pix_height = buf_size / (img_pix_width * canvas_type);
+        if (fmt == VBI_PIXFMT_RGBA32_LE) {
+                RETVAL = zvbi_xs_convert_rgba_to_xpm(pg_obj, p_img, img_pix_width, img_pix_height, scale);
+        } else {
+                RETVAL = zvbi_xs_convert_pal8_to_xpm(pg_obj, p_img, img_pix_width, img_pix_height, scale);
         }
-        /*
-         * Write the image header (including image dimensions)
-         */
-        RETVAL = newSVpvf("/* XPM */\n"
-                          "static char *image[] = {\n"
-                          "/* width height ncolors chars_per_pixel */\n"
-                          "\"%d %d %d %d\",\n"
-                          "/* colors */\n",
-                          rowstride / sizeof(vbi_rgba), pix_height, col_idx, 1);
-        /*
-         * Write the color palette
-         */
-        hv_iterinit(hv);
-        while ((sv = hv_iternextsv(hv, &p_key, &key_len)) != NULL) {
-                int cval;
-                sscanf(p_key, "%X", &cval);
-                sv_catpvf(RETVAL, "\"%c c #%02X%02X%02X\",\n",
-                                  '0' + SvIV(sv),
-                                  cval & 0xFF,
-                                  (cval >> 8) & 0xFF,
-                                  (cval >> 16) & 0xFF);
-        }
-        /*
-         * Write the image row by row
-         */
-        sv_catpv(RETVAL, "/* pixels */\n");
-        code[1] = 0;
-        for (row = 0; row < pix_height; row++) {
-                sv_catpv(RETVAL, "\"");
-                idx = row * rowstride / sizeof(vbi_rgba);
-                for (col = 0; col < rowstride / sizeof(vbi_rgba); col++, idx++) {
-                        sprintf(key, "%06X", p_img[idx] & 0xFFFFFF);
-                        sv = *hv_fetch(hv, key, 6, 0);
-                        code[0] = '0' + SvIV(sv);
-                        sv_catpv(RETVAL, code);
-                }
-                sv_catpv(RETVAL, "\",\n");
-        }
-        sv_catpv(RETVAL, "};\n");
-        SvREFCNT_dec(hv);
         OUTPUT:
         RETVAL
 
@@ -3044,12 +3184,20 @@ MODULE = Video::Capture::ZVBI	PACKAGE = Video::Capture::ZVBI
 void
 lib_version()
         PPCODE:
-{
         EXTEND(sp, 3);
         PUSHs (sv_2mortal (newSViv (VBI_VERSION_MAJOR)));
         PUSHs (sv_2mortal (newSViv (VBI_VERSION_MINOR)));
         PUSHs (sv_2mortal (newSViv (VBI_VERSION_MICRO)));
-}
+
+vbi_bool
+check_lib_version(major,minor,micro)
+        int major
+        int minor
+        int micro
+        CODE:
+        RETVAL = LIBZVBI_VERSION(major,minor,micro);
+        OUTPUT:
+        RETVAL
 
 void
 set_log_fn(mask, log_fn=NULL, user_data=NULL)
@@ -3149,15 +3297,18 @@ prog_type_string(classf, id)
         }
 
 void
-iconv_caption(src, repl_char=0)
-        const char *           src
-        int                    repl_char
+iconv_caption(sv_src, repl_char=0)
+        SV * sv_src
+        int repl_char
         PREINIT:
+        char * p_src;
         char * p_buf;
+        STRLEN src_len;
         SV * sv;
         PPCODE:
 #if LIBZVBI_VERSION(0,2,23)
-        p_buf = vbi_strndup_iconv_caption("UTF-8", src, strlen(src), repl_char);
+        p_src = (void *) SvPV(sv_src, src_len);
+        p_buf = vbi_strndup_iconv_caption("UTF-8", p_src, src_len, '?');
         if (p_buf != NULL) {
                 sv = sv_2mortal(newSVpv(p_buf, strlen(p_buf)));
                 SvUTF8_on(sv);
@@ -3180,12 +3331,16 @@ caption_unicode(c, to_upper=0)
         SV * sv;
         PPCODE:
 #if LIBZVBI_VERSION(0,2,23)
-        ucs = caption_unicode(c, to_upper);
-        p = uvuni_to_utf8(buf, ucs);
-        sv = sv_2mortal(newSVpv(buf, p - buf));
-        SvUTF8_on(sv);
+        ucs = vbi_caption_unicode(c, to_upper);
+        if (ucs != 0) {
+                p = uvuni_to_utf8(buf, ucs);
+                sv = sv_2mortal(newSVpvn(buf, p - buf));
+                SvUTF8_on(sv);
+        } else {
+                sv = sv_2mortal(newSVpvn("", 0));
+        }
         EXTEND(sp, 1);
-        PUSHs (sv_2mortal(newSVpv(p, strlen(p))));
+        PUSHs (sv);
 #else
         croak("Not supported before libzvbi version 0.2.23");
 #endif
@@ -3193,171 +3348,184 @@ caption_unicode(c, to_upper=0)
 BOOT:
 {
         HV *stash = gv_stashpv("Video::Capture::ZVBI", TRUE);
+        AV * exports;
 
         MY_CXT_INIT;
 
-        /* capture interface */
-        newCONSTSUB(stash, "VBI_SLICED_NONE", newSViv(VBI_SLICED_NONE));
-        newCONSTSUB(stash, "VBI_SLICED_UNKNOWN", newSViv(VBI_SLICED_UNKNOWN));
-        newCONSTSUB(stash, "VBI_SLICED_ANTIOPE", newSViv(VBI_SLICED_ANTIOPE));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_A", newSViv(VBI_SLICED_TELETEXT_A));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_B_L10_625", newSViv(VBI_SLICED_TELETEXT_B_L10_625));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_B_L25_625", newSViv(VBI_SLICED_TELETEXT_B_L25_625));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_B", newSViv(VBI_SLICED_TELETEXT_B));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_B_625", newSViv(VBI_SLICED_TELETEXT_B_625));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_C_625", newSViv(VBI_SLICED_TELETEXT_C_625));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_D_625", newSViv(VBI_SLICED_TELETEXT_D_625));
-        newCONSTSUB(stash, "VBI_SLICED_VPS", newSViv(VBI_SLICED_VPS));
-        newCONSTSUB(stash, "VBI_SLICED_VPS_F2", newSViv(VBI_SLICED_VPS_F2));
-        newCONSTSUB(stash, "VBI_SLICED_CAPTION_625_F1", newSViv(VBI_SLICED_CAPTION_625_F1));
-        newCONSTSUB(stash, "VBI_SLICED_CAPTION_625_F2", newSViv(VBI_SLICED_CAPTION_625_F2));
-        newCONSTSUB(stash, "VBI_SLICED_CAPTION_625", newSViv(VBI_SLICED_CAPTION_625));
-        newCONSTSUB(stash, "VBI_SLICED_WSS_625", newSViv(VBI_SLICED_WSS_625));
-        newCONSTSUB(stash, "VBI_SLICED_CAPTION_525_F1", newSViv(VBI_SLICED_CAPTION_525_F1));
-        newCONSTSUB(stash, "VBI_SLICED_CAPTION_525_F2", newSViv(VBI_SLICED_CAPTION_525_F2));
-        newCONSTSUB(stash, "VBI_SLICED_CAPTION_525", newSViv(VBI_SLICED_CAPTION_525));
-        newCONSTSUB(stash, "VBI_SLICED_2xCAPTION_525", newSViv(VBI_SLICED_2xCAPTION_525));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_B_525", newSViv(VBI_SLICED_TELETEXT_B_525));
-        newCONSTSUB(stash, "VBI_SLICED_NABTS", newSViv(VBI_SLICED_NABTS));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_C_525", newSViv(VBI_SLICED_TELETEXT_C_525));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_BD_525", newSViv(VBI_SLICED_TELETEXT_BD_525));
-        newCONSTSUB(stash, "VBI_SLICED_TELETEXT_D_525", newSViv(VBI_SLICED_TELETEXT_D_525));
-        newCONSTSUB(stash, "VBI_SLICED_WSS_CPR1204", newSViv(VBI_SLICED_WSS_CPR1204));
-        newCONSTSUB(stash, "VBI_SLICED_VBI_625", newSViv(VBI_SLICED_VBI_625));
-        newCONSTSUB(stash, "VBI_SLICED_VBI_525", newSViv(VBI_SLICED_VBI_525));
+        exports = get_av("Video::Capture::ZVBI::EXPORT_OK", 1);
+        if (exports == NULL) {
+                croak("Failed to create EXPORT_OK array");
+                return;
+        }
+#define EXPORT_XS_CONST(NAME) \
+                newCONSTSUB(stash, #NAME, newSViv (NAME)); \
+                av_push (exports, newSVpv (#NAME, strlen (#NAME)));
 
-        newCONSTSUB(stash, "VBI_FD_HAS_SELECT", newSViv(VBI_FD_HAS_SELECT));
-        newCONSTSUB(stash, "VBI_FD_HAS_MMAP", newSViv(VBI_FD_HAS_MMAP));
-        newCONSTSUB(stash, "VBI_FD_IS_DEVICE", newSViv(VBI_FD_IS_DEVICE));
+        /* capture interface */
+        EXPORT_XS_CONST( VBI_SLICED_NONE );
+        EXPORT_XS_CONST( VBI_SLICED_UNKNOWN );
+        EXPORT_XS_CONST( VBI_SLICED_ANTIOPE );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_A );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_L10_625 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_L25_625 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_625 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_C_625 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_D_625 );
+        EXPORT_XS_CONST( VBI_SLICED_VPS );
+        EXPORT_XS_CONST( VBI_SLICED_VPS_F2 );
+        EXPORT_XS_CONST( VBI_SLICED_CAPTION_625_F1 );
+        EXPORT_XS_CONST( VBI_SLICED_CAPTION_625_F2 );
+        EXPORT_XS_CONST( VBI_SLICED_CAPTION_625 );
+        EXPORT_XS_CONST( VBI_SLICED_WSS_625 );
+        EXPORT_XS_CONST( VBI_SLICED_CAPTION_525_F1 );
+        EXPORT_XS_CONST( VBI_SLICED_CAPTION_525_F2 );
+        EXPORT_XS_CONST( VBI_SLICED_CAPTION_525 );
+        EXPORT_XS_CONST( VBI_SLICED_2xCAPTION_525 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_525 );
+        EXPORT_XS_CONST( VBI_SLICED_NABTS );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_C_525 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_BD_525 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_D_525 );
+        EXPORT_XS_CONST( VBI_SLICED_WSS_CPR1204 );
+        EXPORT_XS_CONST( VBI_SLICED_VBI_625 );
+        EXPORT_XS_CONST( VBI_SLICED_VBI_525 );
+
+        EXPORT_XS_CONST( VBI_FD_HAS_SELECT );
+        EXPORT_XS_CONST( VBI_FD_HAS_MMAP );
+        EXPORT_XS_CONST( VBI_FD_IS_DEVICE );
 
         /* proxy interface */
-        newCONSTSUB(stash, "VBI_PROXY_CLIENT_NO_TIMEOUTS", newSViv(VBI_PROXY_CLIENT_NO_TIMEOUTS));
-        newCONSTSUB(stash, "VBI_PROXY_CLIENT_NO_STATUS_IND", newSViv(VBI_PROXY_CLIENT_NO_STATUS_IND));
+        EXPORT_XS_CONST( VBI_PROXY_CLIENT_NO_TIMEOUTS );
+        EXPORT_XS_CONST( VBI_PROXY_CLIENT_NO_STATUS_IND );
 
-        newCONSTSUB(stash, "VBI_CHN_PRIO_BACKGROUND", newSViv(VBI_CHN_PRIO_BACKGROUND));
-        newCONSTSUB(stash, "VBI_CHN_PRIO_INTERACTIVE", newSViv(VBI_CHN_PRIO_INTERACTIVE));
-        newCONSTSUB(stash, "VBI_CHN_PRIO_DEFAULT", newSViv(VBI_CHN_PRIO_DEFAULT));
-        newCONSTSUB(stash, "VBI_CHN_PRIO_RECORD", newSViv(VBI_CHN_PRIO_RECORD));
+        EXPORT_XS_CONST( VBI_CHN_PRIO_BACKGROUND );
+        EXPORT_XS_CONST( VBI_CHN_PRIO_INTERACTIVE );
+        EXPORT_XS_CONST( VBI_CHN_PRIO_DEFAULT );
+        EXPORT_XS_CONST( VBI_CHN_PRIO_RECORD );
 
-        newCONSTSUB(stash, "VBI_CHN_SUBPRIO_MINIMAL", newSViv(VBI_CHN_SUBPRIO_MINIMAL));
-        newCONSTSUB(stash, "VBI_CHN_SUBPRIO_CHECK", newSViv(VBI_CHN_SUBPRIO_CHECK));
-        newCONSTSUB(stash, "VBI_CHN_SUBPRIO_UPDATE", newSViv(VBI_CHN_SUBPRIO_UPDATE));
-        newCONSTSUB(stash, "VBI_CHN_SUBPRIO_INITIAL", newSViv(VBI_CHN_SUBPRIO_INITIAL));
-        newCONSTSUB(stash, "VBI_CHN_SUBPRIO_VPS_PDC", newSViv(VBI_CHN_SUBPRIO_VPS_PDC));
+        EXPORT_XS_CONST( VBI_CHN_SUBPRIO_MINIMAL );
+        EXPORT_XS_CONST( VBI_CHN_SUBPRIO_CHECK );
+        EXPORT_XS_CONST( VBI_CHN_SUBPRIO_UPDATE );
+        EXPORT_XS_CONST( VBI_CHN_SUBPRIO_INITIAL );
+        EXPORT_XS_CONST( VBI_CHN_SUBPRIO_VPS_PDC );
 
-        newCONSTSUB(stash, "VBI_PROXY_CHN_RELEASE", newSViv(VBI_PROXY_CHN_RELEASE));
-        newCONSTSUB(stash, "VBI_PROXY_CHN_TOKEN", newSViv(VBI_PROXY_CHN_TOKEN));
-        newCONSTSUB(stash, "VBI_PROXY_CHN_FLUSH", newSViv(VBI_PROXY_CHN_FLUSH));
-        newCONSTSUB(stash, "VBI_PROXY_CHN_NORM", newSViv(VBI_PROXY_CHN_NORM));
-        newCONSTSUB(stash, "VBI_PROXY_CHN_FAIL", newSViv(VBI_PROXY_CHN_FAIL));
-        newCONSTSUB(stash, "VBI_PROXY_CHN_NONE", newSViv(VBI_PROXY_CHN_NONE));
+        EXPORT_XS_CONST( VBI_PROXY_CHN_RELEASE );
+        EXPORT_XS_CONST( VBI_PROXY_CHN_TOKEN );
+        EXPORT_XS_CONST( VBI_PROXY_CHN_FLUSH );
+        EXPORT_XS_CONST( VBI_PROXY_CHN_NORM );
+        EXPORT_XS_CONST( VBI_PROXY_CHN_FAIL );
+        EXPORT_XS_CONST( VBI_PROXY_CHN_NONE );
 
-        newCONSTSUB(stash, "VBI_API_UNKNOWN", newSViv(VBI_API_UNKNOWN));
-        newCONSTSUB(stash, "VBI_API_V4L1", newSViv(VBI_API_V4L1));
-        newCONSTSUB(stash, "VBI_API_V4L2", newSViv(VBI_API_V4L2));
-        newCONSTSUB(stash, "VBI_API_BKTR", newSViv(VBI_API_BKTR));
+        EXPORT_XS_CONST( VBI_API_UNKNOWN );
+        EXPORT_XS_CONST( VBI_API_V4L1 );
+        EXPORT_XS_CONST( VBI_API_V4L2 );
+        EXPORT_XS_CONST( VBI_API_BKTR );
 
-        newCONSTSUB(stash, "VBI_PROXY_EV_CHN_GRANTED", newSViv(VBI_PROXY_EV_CHN_GRANTED));
-        newCONSTSUB(stash, "VBI_PROXY_EV_CHN_CHANGED", newSViv(VBI_PROXY_EV_CHN_CHANGED));
-        newCONSTSUB(stash, "VBI_PROXY_EV_NORM_CHANGED", newSViv(VBI_PROXY_EV_NORM_CHANGED));
-        newCONSTSUB(stash, "VBI_PROXY_EV_CHN_RECLAIMED", newSViv(VBI_PROXY_EV_CHN_RECLAIMED));
-        newCONSTSUB(stash, "VBI_PROXY_EV_NONE", newSViv(VBI_PROXY_EV_NONE));
+        EXPORT_XS_CONST( VBI_PROXY_EV_CHN_GRANTED );
+        EXPORT_XS_CONST( VBI_PROXY_EV_CHN_CHANGED );
+        EXPORT_XS_CONST( VBI_PROXY_EV_NORM_CHANGED );
+        EXPORT_XS_CONST( VBI_PROXY_EV_CHN_RECLAIMED );
+        EXPORT_XS_CONST( VBI_PROXY_EV_NONE );
 
         /* demux */
-        newCONSTSUB(stash, "VBI_IDL_DATA_LOST", newSViv(VBI_IDL_DATA_LOST));
-        newCONSTSUB(stash, "VBI_IDL_DEPENDENT", newSViv(VBI_IDL_DEPENDENT));
+        EXPORT_XS_CONST( VBI_IDL_DATA_LOST );
+        EXPORT_XS_CONST( VBI_IDL_DEPENDENT );
 
         /* vt object */
-        newCONSTSUB(stash, "VBI_EVENT_NONE", newSViv(VBI_EVENT_NONE));
-        newCONSTSUB(stash, "VBI_EVENT_CLOSE", newSViv(VBI_EVENT_CLOSE));
-        newCONSTSUB(stash, "VBI_EVENT_TTX_PAGE", newSViv(VBI_EVENT_TTX_PAGE));
-        newCONSTSUB(stash, "VBI_EVENT_CAPTION", newSViv(VBI_EVENT_CAPTION));
-        newCONSTSUB(stash, "VBI_EVENT_NETWORK", newSViv(VBI_EVENT_NETWORK));
-        newCONSTSUB(stash, "VBI_EVENT_TRIGGER", newSViv(VBI_EVENT_TRIGGER));
-        newCONSTSUB(stash, "VBI_EVENT_ASPECT", newSViv(VBI_EVENT_ASPECT));
-        newCONSTSUB(stash, "VBI_EVENT_PROG_INFO", newSViv(VBI_EVENT_PROG_INFO));
+        EXPORT_XS_CONST( VBI_EVENT_NONE );
+        EXPORT_XS_CONST( VBI_EVENT_CLOSE );
+        EXPORT_XS_CONST( VBI_EVENT_TTX_PAGE );
+        EXPORT_XS_CONST( VBI_EVENT_CAPTION );
+        EXPORT_XS_CONST( VBI_EVENT_NETWORK );
+        EXPORT_XS_CONST( VBI_EVENT_TRIGGER );
+        EXPORT_XS_CONST( VBI_EVENT_ASPECT );
+        EXPORT_XS_CONST( VBI_EVENT_PROG_INFO );
 #ifdef VBI_EVENT_NETWORK_ID
-        newCONSTSUB(stash, "VBI_EVENT_NETWORK_ID", newSViv(VBI_EVENT_NETWORK_ID));
+        EXPORT_XS_CONST( VBI_EVENT_NETWORK_ID );
 #endif
 
-        newCONSTSUB(stash, "VBI_WST_LEVEL_1", newSViv(VBI_WST_LEVEL_1));
-        newCONSTSUB(stash, "VBI_WST_LEVEL_1p5", newSViv(VBI_WST_LEVEL_1p5));
-        newCONSTSUB(stash, "VBI_WST_LEVEL_2p5", newSViv(VBI_WST_LEVEL_2p5));
-        newCONSTSUB(stash, "VBI_WST_LEVEL_3p5", newSViv(VBI_WST_LEVEL_3p5));
+        EXPORT_XS_CONST( VBI_WST_LEVEL_1 );
+        EXPORT_XS_CONST( VBI_WST_LEVEL_1p5 );
+        EXPORT_XS_CONST( VBI_WST_LEVEL_2p5 );
+        EXPORT_XS_CONST( VBI_WST_LEVEL_3p5 );
 
         /* VT pages */
-        newCONSTSUB(stash, "VBI_LINK_NONE", newSViv(VBI_LINK_NONE));
-        newCONSTSUB(stash, "VBI_LINK_MESSAGE", newSViv(VBI_LINK_MESSAGE));
-        newCONSTSUB(stash, "VBI_LINK_PAGE", newSViv(VBI_LINK_PAGE));
-        newCONSTSUB(stash, "VBI_LINK_SUBPAGE", newSViv(VBI_LINK_SUBPAGE));
-        newCONSTSUB(stash, "VBI_LINK_HTTP", newSViv(VBI_LINK_HTTP));
-        newCONSTSUB(stash, "VBI_LINK_FTP", newSViv(VBI_LINK_FTP));
-        newCONSTSUB(stash, "VBI_LINK_EMAIL", newSViv(VBI_LINK_EMAIL));
-        newCONSTSUB(stash, "VBI_LINK_LID", newSViv(VBI_LINK_LID));
-        newCONSTSUB(stash, "VBI_LINK_TELEWEB", newSViv(VBI_LINK_TELEWEB));
+        EXPORT_XS_CONST( VBI_LINK_NONE );
+        EXPORT_XS_CONST( VBI_LINK_MESSAGE );
+        EXPORT_XS_CONST( VBI_LINK_PAGE );
+        EXPORT_XS_CONST( VBI_LINK_SUBPAGE );
+        EXPORT_XS_CONST( VBI_LINK_HTTP );
+        EXPORT_XS_CONST( VBI_LINK_FTP );
+        EXPORT_XS_CONST( VBI_LINK_EMAIL );
+        EXPORT_XS_CONST( VBI_LINK_LID );
+        EXPORT_XS_CONST( VBI_LINK_TELEWEB );
 
-        newCONSTSUB(stash, "VBI_WEBLINK_UNKNOWN", newSViv(VBI_WEBLINK_UNKNOWN));
-        newCONSTSUB(stash, "VBI_WEBLINK_PROGRAM_RELATED", newSViv(VBI_WEBLINK_PROGRAM_RELATED));
-        newCONSTSUB(stash, "VBI_WEBLINK_NETWORK_RELATED", newSViv(VBI_WEBLINK_NETWORK_RELATED));
-        newCONSTSUB(stash, "VBI_WEBLINK_STATION_RELATED", newSViv(VBI_WEBLINK_STATION_RELATED));
-        newCONSTSUB(stash, "VBI_WEBLINK_SPONSOR_MESSAGE", newSViv(VBI_WEBLINK_SPONSOR_MESSAGE));
-        newCONSTSUB(stash, "VBI_WEBLINK_OPERATOR", newSViv(VBI_WEBLINK_OPERATOR));
+        EXPORT_XS_CONST( VBI_WEBLINK_UNKNOWN );
+        EXPORT_XS_CONST( VBI_WEBLINK_PROGRAM_RELATED );
+        EXPORT_XS_CONST( VBI_WEBLINK_NETWORK_RELATED );
+        EXPORT_XS_CONST( VBI_WEBLINK_STATION_RELATED );
+        EXPORT_XS_CONST( VBI_WEBLINK_SPONSOR_MESSAGE );
+        EXPORT_XS_CONST( VBI_WEBLINK_OPERATOR );
 
-        newCONSTSUB(stash, "VBI_SUBT_NONE", newSViv(VBI_SUBT_NONE));
-        newCONSTSUB(stash, "VBI_SUBT_ACTIVE", newSViv(VBI_SUBT_ACTIVE));
-        newCONSTSUB(stash, "VBI_SUBT_MATTE", newSViv(VBI_SUBT_MATTE));
-        newCONSTSUB(stash, "VBI_SUBT_UNKNOWN", newSViv(VBI_SUBT_UNKNOWN));
+        EXPORT_XS_CONST( VBI_SUBT_NONE );
+        EXPORT_XS_CONST( VBI_SUBT_ACTIVE );
+        EXPORT_XS_CONST( VBI_SUBT_MATTE );
+        EXPORT_XS_CONST( VBI_SUBT_UNKNOWN );
 
-        newCONSTSUB(stash, "VBI_BLACK", newSViv(VBI_BLACK));
-        newCONSTSUB(stash, "VBI_RED", newSViv(VBI_RED));
-        newCONSTSUB(stash, "VBI_GREEN", newSViv(VBI_GREEN));
-        newCONSTSUB(stash, "VBI_YELLOW", newSViv(VBI_YELLOW));
-        newCONSTSUB(stash, "VBI_BLUE", newSViv(VBI_BLUE));
-        newCONSTSUB(stash, "VBI_MAGENTA", newSViv(VBI_MAGENTA));
-        newCONSTSUB(stash, "VBI_CYAN", newSViv(VBI_CYAN));
-        newCONSTSUB(stash, "VBI_WHITE", newSViv(VBI_WHITE));
+        EXPORT_XS_CONST( VBI_BLACK );
+        EXPORT_XS_CONST( VBI_RED );
+        EXPORT_XS_CONST( VBI_GREEN );
+        EXPORT_XS_CONST( VBI_YELLOW );
+        EXPORT_XS_CONST( VBI_BLUE );
+        EXPORT_XS_CONST( VBI_MAGENTA );
+        EXPORT_XS_CONST( VBI_CYAN );
+        EXPORT_XS_CONST( VBI_WHITE );
 
-        newCONSTSUB(stash, "VBI_TRANSPARENT_SPACE", newSViv(VBI_TRANSPARENT_SPACE));
-        newCONSTSUB(stash, "VBI_TRANSPARENT_FULL", newSViv(VBI_TRANSPARENT_FULL));
-        newCONSTSUB(stash, "VBI_SEMI_TRANSPARENT", newSViv(VBI_SEMI_TRANSPARENT));
-        newCONSTSUB(stash, "VBI_OPAQUE", newSViv(VBI_OPAQUE));
+        EXPORT_XS_CONST( VBI_TRANSPARENT_SPACE );
+        EXPORT_XS_CONST( VBI_TRANSPARENT_FULL );
+        EXPORT_XS_CONST( VBI_SEMI_TRANSPARENT );
+        EXPORT_XS_CONST( VBI_OPAQUE );
 
-        newCONSTSUB(stash, "VBI_NORMAL_SIZE", newSViv(VBI_NORMAL_SIZE));
-        newCONSTSUB(stash, "VBI_DOUBLE_WIDTH", newSViv(VBI_DOUBLE_WIDTH));
-        newCONSTSUB(stash, "VBI_DOUBLE_HEIGHT", newSViv(VBI_DOUBLE_HEIGHT));
-        newCONSTSUB(stash, "VBI_DOUBLE_SIZE", newSViv(VBI_DOUBLE_SIZE));
-        newCONSTSUB(stash, "VBI_OVER_TOP", newSViv(VBI_OVER_TOP));
-        newCONSTSUB(stash, "VBI_OVER_BOTTOM", newSViv(VBI_OVER_BOTTOM));
-        newCONSTSUB(stash, "VBI_DOUBLE_HEIGHT2", newSViv(VBI_DOUBLE_HEIGHT2));
-        newCONSTSUB(stash, "VBI_DOUBLE_SIZE2", newSViv(VBI_DOUBLE_SIZE2));
+        EXPORT_XS_CONST( VBI_NORMAL_SIZE );
+        EXPORT_XS_CONST( VBI_DOUBLE_WIDTH );
+        EXPORT_XS_CONST( VBI_DOUBLE_HEIGHT );
+        EXPORT_XS_CONST( VBI_DOUBLE_SIZE );
+        EXPORT_XS_CONST( VBI_OVER_TOP );
+        EXPORT_XS_CONST( VBI_OVER_BOTTOM );
+        EXPORT_XS_CONST( VBI_DOUBLE_HEIGHT2 );
+        EXPORT_XS_CONST( VBI_DOUBLE_SIZE2 );
 
         /* search */
-        newCONSTSUB(stash, "VBI_ANY_SUBNO", newSViv(VBI_ANY_SUBNO));
-        newCONSTSUB(stash, "VBI_SEARCH_ERROR", newSViv(VBI_SEARCH_ERROR));
-        newCONSTSUB(stash, "VBI_SEARCH_CACHE_EMPTY", newSViv(VBI_SEARCH_CACHE_EMPTY));
-        newCONSTSUB(stash, "VBI_SEARCH_CANCELED", newSViv(VBI_SEARCH_CANCELED));
-        newCONSTSUB(stash, "VBI_SEARCH_NOT_FOUND", newSViv(VBI_SEARCH_NOT_FOUND));
-        newCONSTSUB(stash, "VBI_SEARCH_SUCCESS", newSViv(VBI_SEARCH_SUCCESS));
+        EXPORT_XS_CONST( VBI_ANY_SUBNO );
+        EXPORT_XS_CONST( VBI_SEARCH_ERROR );
+        EXPORT_XS_CONST( VBI_SEARCH_CACHE_EMPTY );
+        EXPORT_XS_CONST( VBI_SEARCH_CANCELED );
+        EXPORT_XS_CONST( VBI_SEARCH_NOT_FOUND );
+        EXPORT_XS_CONST( VBI_SEARCH_SUCCESS );
 
         /* export */
-        newCONSTSUB(stash, "VBI_PIXFMT_RGBA32_LE", newSViv(VBI_PIXFMT_RGBA32_LE));
-        newCONSTSUB(stash, "VBI_PIXFMT_YUV420", newSViv(VBI_PIXFMT_YUV420));
+        EXPORT_XS_CONST( VBI_PIXFMT_RGBA32_LE );
+        EXPORT_XS_CONST( VBI_PIXFMT_YUV420 );
+#if LIBZVBI_VERSION(0,2,26)
+        EXPORT_XS_CONST( VBI_PIXFMT_PAL8 );
+#endif
 
-        newCONSTSUB(stash, "VBI_OPTION_BOOL", newSViv(VBI_OPTION_BOOL));
-        newCONSTSUB(stash, "VBI_OPTION_INT", newSViv(VBI_OPTION_INT));
-        newCONSTSUB(stash, "VBI_OPTION_REAL", newSViv(VBI_OPTION_REAL));
-        newCONSTSUB(stash, "VBI_OPTION_STRING", newSViv(VBI_OPTION_STRING));
-        newCONSTSUB(stash, "VBI_OPTION_MENU", newSViv(VBI_OPTION_MENU));
+        EXPORT_XS_CONST( VBI_OPTION_BOOL );
+        EXPORT_XS_CONST( VBI_OPTION_INT );
+        EXPORT_XS_CONST( VBI_OPTION_REAL );
+        EXPORT_XS_CONST( VBI_OPTION_STRING );
+        EXPORT_XS_CONST( VBI_OPTION_MENU );
 
         /* logging */
 #if LIBZVBI_VERSION(0,2,22)
-        newCONSTSUB(stash, "VBI_LOG_ERROR", newSViv(VBI_LOG_ERROR));
-        newCONSTSUB(stash, "VBI_LOG_WARNING", newSViv(VBI_LOG_WARNING));
-        newCONSTSUB(stash, "VBI_LOG_NOTICE", newSViv(VBI_LOG_NOTICE));
-        newCONSTSUB(stash, "VBI_LOG_INFO", newSViv(VBI_LOG_INFO));
-        newCONSTSUB(stash, "VBI_LOG_DEBUG", newSViv(VBI_LOG_DEBUG));
-        newCONSTSUB(stash, "VBI_LOG_DRIVER", newSViv(VBI_LOG_DRIVER));
-        newCONSTSUB(stash, "VBI_LOG_DEBUG2", newSViv(VBI_LOG_DEBUG2));
-        newCONSTSUB(stash, "VBI_LOG_DEBUG3", newSViv(VBI_LOG_DEBUG3));
+        EXPORT_XS_CONST( VBI_LOG_ERROR );
+        EXPORT_XS_CONST( VBI_LOG_WARNING );
+        EXPORT_XS_CONST( VBI_LOG_NOTICE );
+        EXPORT_XS_CONST( VBI_LOG_INFO );
+        EXPORT_XS_CONST( VBI_LOG_DEBUG );
+        EXPORT_XS_CONST( VBI_LOG_DRIVER );
+        EXPORT_XS_CONST( VBI_LOG_DEBUG2 );
+        EXPORT_XS_CONST( VBI_LOG_DEBUG3 );
 #endif
 }

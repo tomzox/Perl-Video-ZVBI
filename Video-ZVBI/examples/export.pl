@@ -24,10 +24,10 @@
 # ZVBI #Id: export.c,v 1.13 2005/10/04 10:06:11 mschimek Exp #
 
 use blib;
-use Video::Capture::ZVBI;
+use strict;
 use POSIX;
 use IO::Handle;
-use strict;
+use Video::Capture::ZVBI qw(/^VBI_/);
 
 my $vbi;
 my $quit = 0;
@@ -60,7 +60,7 @@ sub handler {
         # Fetching & exporting here is a bad idea,
         # but this is only a test.
         $page = $vbi->fetch_vt_page($ev->{pgno}, $ev->{subno},
-                                    Video::Capture::ZVBI::VBI_WST_LEVEL_3p5, 25, 1) || die;
+                                    VBI_WST_LEVEL_3p5, 25, 1) || die;
 
         my $io = new IO::Handle;
         # Just for fun
@@ -92,17 +92,15 @@ sub handler {
 sub pes_mainloop
 {
         my $buffer;
+        my $sliced;
+        my $lines;
+        my $pts;
 
-        while (sysread (STDIN, $buffer, 2048) > 0) {
+        while (read (STDIN, $buffer, 2048)) {
                 my $buf_left = length($buffer);
 
                 while ($buf_left > 0) {
-                        my $sliced;
-                        my $lines;
-                        my $pts;
-
-                        $lines = $dx->demux_cor ($sliced, 64,
-                                                 $pts, $buffer, $buf_left);
+                        $lines = $dx->cor ($sliced, 64, $pts, $buffer, $buf_left);
                         if ($lines > 0) {
                                 $vbi->decode ($sliced, $lines, $pts / 90000.0);
                         }
@@ -118,7 +116,7 @@ sub old_mainloop
 {
         my $opt_device = "/dev/vbi0";
         my $opt_buf_count = 5;
-        my $opt_services = Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B;
+        my $opt_services = VBI_SLICED_TELETEXT_B;
         my $opt_strict = 0;
         my $opt_debug_level = 0;
 
@@ -174,7 +172,7 @@ sub main_func
         $vbi = Video::Capture::ZVBI::vt::decoder_new();
         die "Failed to create VT decoder\n" unless defined $vbi;
 
-        my $ok = $vbi->event_handler_add(Video::Capture::ZVBI::VBI_EVENT_TTX_PAGE, \&handler); 
+        my $ok = $vbi->event_handler_add(VBI_EVENT_TTX_PAGE, \&handler); 
         die "Failed to install VT event handler\n" unless $ok;
 
         my $c = 1;
@@ -182,7 +180,7 @@ sub main_func
         #IO::Handle::ungetc($c);
 
         if (0 == $c) {
-                $dx = Video::Capture::ZVBI::DVB::pes_demux_new();
+                $dx = Video::Capture::ZVBI::dvbdemux::new ();
                 die unless defined $dx;
 
                 pes_mainloop ();

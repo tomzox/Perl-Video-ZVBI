@@ -24,11 +24,11 @@
 # ZVBI #Id: capture.c,v 1.26 2006/10/08 06:19:48 mschimek Exp #
 
 use blib;
-use Video::Capture::ZVBI;
+use strict;
 use Getopt::Long;
 use POSIX;
 use IO::Handle;
-use strict;
+use Video::Capture::ZVBI qw(/^VBI_/);
 
 my $cap;
 my $par;
@@ -241,17 +241,17 @@ sub decode_sliced {
 
                 if ($id == 0) {
                         next;
-                } elsif ($id & Video::Capture::ZVBI::VBI_SLICED_VPS) {
+                } elsif ($id & VBI_SLICED_VPS) {
                       decode_vps($data);
-                } elsif ($id & Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B) {
+                } elsif ($id & VBI_SLICED_TELETEXT_B) {
                       # Use ./decode instead.
-                } elsif ($id & Video::Capture::ZVBI::VBI_SLICED_CAPTION_525) {
+                } elsif ($id & VBI_SLICED_CAPTION_525) {
                       # Use ./decode instead.
-                } elsif ($id & Video::Capture::ZVBI::VBI_SLICED_CAPTION_625) {
+                } elsif ($id & VBI_SLICED_CAPTION_625) {
                       # Use ./decode instead.
-                } elsif ($id & Video::Capture::ZVBI::VBI_SLICED_WSS_625) {
+                } elsif ($id & VBI_SLICED_WSS_625) {
                       decode_wss_625($data);
-                } elsif ($id & Video::Capture::ZVBI::VBI_SLICED_WSS_CPR1204) {
+                } elsif ($id & VBI_SLICED_WSS_CPR1204) {
                         decode_wss_cpr1204($data);
                 } else {
                         printf STDERR "Oops. Unhandled vbi service %08x\n", $id;
@@ -264,13 +264,14 @@ sub decode_sliced {
 #
 
 # hysterical compatibility
+# (syntax note: "&" is required here to avoid auto-quoting of the bareword before "=>")
 my %ServiceWidth = (
-        Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B => [42, 0],
-        Video::Capture::ZVBI::VBI_SLICED_CAPTION_625 => [2, 1],
-        Video::Capture::ZVBI::VBI_SLICED_VPS => [13, 2],
-        Video::Capture::ZVBI::VBI_SLICED_WSS_625 => [2, 3],
-        Video::Capture::ZVBI::VBI_SLICED_WSS_CPR1204 => [3, 4],
-        Video::Capture::ZVBI::VBI_SLICED_CAPTION_525 => [2, 7],
+        &VBI_SLICED_TELETEXT_B => [42, 0],
+        &VBI_SLICED_CAPTION_625 => [2, 1],
+        &VBI_SLICED_VPS => [13, 2],
+        &VBI_SLICED_WSS_625 => [2, 3],
+        &VBI_SLICED_WSS_CPR1204 => [3, 4],
+        &VBI_SLICED_CAPTION_525 => [2, 7],
 );
 
 sub binary_sliced {
@@ -402,14 +403,14 @@ sub main_func {
 
         $dump = $dump_wss | $dump_vps | $dump_sliced;
 
-        $services = Video::Capture::ZVBI::VBI_SLICED_VBI_525 |
-                    Video::Capture::ZVBI::VBI_SLICED_VBI_625 |
-                    Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B |
-                    Video::Capture::ZVBI::VBI_SLICED_CAPTION_525 |
-                    Video::Capture::ZVBI::VBI_SLICED_CAPTION_625 |
-                    Video::Capture::ZVBI::VBI_SLICED_VPS |
-                    Video::Capture::ZVBI::VBI_SLICED_WSS_625 |
-                    Video::Capture::ZVBI::VBI_SLICED_WSS_CPR1204;
+        $services = VBI_SLICED_VBI_525 |
+                    VBI_SLICED_VBI_625 |
+                    VBI_SLICED_TELETEXT_B |
+                    VBI_SLICED_CAPTION_525 |
+                    VBI_SLICED_CAPTION_625 |
+                    VBI_SLICED_VPS |
+                    VBI_SLICED_WSS_625 |
+                    VBI_SLICED_WSS_CPR1204;
 
         if ($do_sim) {
                 #$cap = Video::Capture::ZVBI::sim_new ($scanning, $services, 0, !$desync);
@@ -484,7 +485,7 @@ sub main_func {
         }
 
         if (-1 == $pid) {
-                die unless ($par->{sampling_format} == Video::Capture::ZVBI::VBI_PIXFMT_YUV420);
+                die unless ($par->{sampling_format} == VBI_PIXFMT_YUV420);
         }
 
         if ($bin_pes) {

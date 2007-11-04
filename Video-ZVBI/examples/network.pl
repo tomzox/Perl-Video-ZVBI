@@ -27,10 +27,9 @@
 # in XDS packets, Teletext packet 8/30 format 1 and 2, and VPS packets.
 
 use blib;
-use Video::Capture::ZVBI;
-use Encode;
 use strict;
-
+use Encode;
+use Video::Capture::ZVBI qw(/^VBI_/);
 
 my $cap;
 my $dec;
@@ -50,11 +49,11 @@ sub handler
 	# receives a CNI. VBI_EVENT_NETWORK only if it can
 	# determine a network name.
 
-	if ($ev_type == Video::Capture::ZVBI::VBI_EVENT_NETWORK) {
+	if ($ev_type == VBI_EVENT_NETWORK) {
 		$event_name = "VBI_EVENT_NETWORK";
 		$quit = 1;
 
-	} elsif ($ev_type == Video::Capture::ZVBI::VBI_EVENT_NETWORK_ID) {
+	} elsif ($ev_type == VBI_EVENT_NETWORK_ID) {
 		$event_name = "VBI_EVENT_NETWORK_ID";
 
         } else {
@@ -97,7 +96,7 @@ sub mainloop
 	$timeout = 2000;
 
 	# Should receive a CNI within two seconds, call sign within ten seconds(?).
-	if ($services & Video::Capture::ZVBI::VBI_SLICED_CAPTION_525) {
+	if ($services & VBI_SLICED_CAPTION_525) {
 		$n_frames = 11 * 30;
 	} else {
 		$n_frames = 3 * 25;
@@ -139,9 +138,9 @@ sub main_func
 	my $errstr;
 	my $success;
 
-	$services = (Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B |
-		     Video::Capture::ZVBI::VBI_SLICED_VPS |
-		     Video::Capture::ZVBI::VBI_SLICED_CAPTION_525);
+	$services = (VBI_SLICED_TELETEXT_B |
+		     VBI_SLICED_VPS |
+		     VBI_SLICED_CAPTION_525);
 
         # open VBI device (buffers:=5, strict:=0, verbose:=FALSE
 	$cap = Video::Capture::ZVBI::capture::v4l2_new ("/dev/vbi0", 5, $services, 0, $errstr, 0);
@@ -150,8 +149,8 @@ sub main_func
 	$dec = Video::Capture::ZVBI::vt::decoder_new ();
 	die "Failed to create VT decoder\n" unless $dec;
 
-	$success = $dec->event_handler_add ( (Video::Capture::ZVBI::VBI_EVENT_NETWORK |
-                                              Video::Capture::ZVBI::VBI_EVENT_NETWORK_ID),
+	$success = $dec->event_handler_add ( (VBI_EVENT_NETWORK |
+                                              VBI_EVENT_NETWORK_ID),
 					     \&handler );
 	die "Failed to install event handler\n" unless $success;
 

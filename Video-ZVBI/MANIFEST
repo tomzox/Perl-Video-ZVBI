@@ -1,6 +1,7 @@
 COPYING
 MANIFEST
 Makefile.PL
+README
 test.pl
 typemap
 ZVBI.pm

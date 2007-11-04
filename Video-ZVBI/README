@@ -73,10 +73,10 @@ and support for V4l2), or to duplicate code from libzvbi into the
 VBI module.  That would have been much more effort and certainly
 less elegant than just creating an interface to libzvbi.
 
-Other benefits are that libzvbi has extensice documentation and is
-optimized for performance (i.e. the ZVBI Perl module is about
-5 to 10 times faster when capturing teletext packets into a file
-than the VBI module.)  The only downside is EPG (ETS 300 707),
+Other benefits are that libzvbi has extensive documentation and is
+optimized for performance (i.e. the ZVBI Perl module is several times
+times faster when capturing teletext packets into a file compared
+to the VBI module.)  The only downside is EPG decoding (ETS 300 707),
 which is supported by the VBI module, but not by libzvbi.
 
 
@@ -91,6 +91,21 @@ in the usual steps:
 perl Makefile.PL
 make
 make install
+
+
+Bug Reports
+-----------
+
+Please send bug reports relating to the interface module to my
+Sourceforge mail address listed above.  Feel free to also mail me
+about feature requests or interface improvements.
+
+If your bug report or request relates to libzvbi rather than the
+interface module, please contact the libzvbi authors, preferrably
+via the zapping mailing list (<http://zapping.sourceforge.net/>)
+In case of capture problems, please make sure to specify which
+operating system and hardware you're using, and of course which
+version of libzvbi and which version of the Perl ZVBI module.
 
 
 Copyright

@@ -23,7 +23,7 @@
 
 use strict;
 use blib;
-use Video::Capture::ZVBI;
+use Video::Capture::ZVBI qw(/^VBI_/);
 use Tk;
 
 my $cap;
@@ -86,7 +86,7 @@ sub cap_frame {
 sub cap_init {
    my $opt_device = "/dev/vbi0";
    my $opt_buf_count = 5;
-   my $opt_services = Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B;
+   my $opt_services = VBI_SLICED_TELETEXT_B;
    my $opt_strict = 0;
    my $opt_debug_level = 0;
    my $err;
@@ -100,7 +100,7 @@ sub cap_init {
    $vtdec = Video::Capture::ZVBI::vt::decoder_new();
    die "failed to create teletext decoder: $!\n" unless defined $vtdec;
 
-   $vtdec->event_handler_add(Video::Capture::ZVBI::VBI_EVENT_TTX_PAGE, \&pg_handler); 
+   $vtdec->event_handler_add(VBI_EVENT_TTX_PAGE, \&pg_handler); 
 }
 
 #
@@ -108,15 +108,22 @@ sub cap_init {
 # which is scheduled for display has been captured.
 #
 sub pg_display {
-   my $pg = $vtdec->fetch_vt_page($pg_sched, 0, Video::Capture::ZVBI::VBI_WST_LEVEL_3p5, 25, 1);
+   my $pg = $vtdec->fetch_vt_page($pg_sched, 0, VBI_WST_LEVEL_3p5, 25, 1);
    if (defined $pg) {
       my ($h, $w) = $pg->get_page_size();
-      my $img_canvas = $pg->draw_vt_page();
+      my $fmt;
+      if (Video::Capture::ZVBI::check_lib_version(0,2,26)) {
+         $fmt = VBI_PIXFMT_PAL8;
+      } else {
+         $fmt = VBI_PIXFMT_RGBA32_LE;
+      }
+      my $img_canvas = $pg->draw_vt_page($fmt);
       $pg_disp = $pg_sched;
 
       $canvas->delete("all");
       undef $img;
-      $img = $main->Pixmap(-data, $pg->rgba_to_xpm($img_canvas));
+      $img = $main->Pixmap(-data, $pg->canvas_to_xpm($img_canvas, $fmt, 1));
+
       my $cid = $canvas->createImage(2,2, -anchor, "nw", -image, $img);
       $canvas->configure(-width, $img->width(), -height, $img->height());
       $canvas->bind($cid, '<Key-q>', sub {exit;});
@@ -132,10 +139,11 @@ sub pg_display {
 sub pg_link {
    my ($wid, $x, $y) = @_;
 
-   my $pg = $vtdec->fetch_vt_page($pg_disp, 0, Video::Capture::ZVBI::VBI_WST_LEVEL_1p5, 25, 1);
+   my $pg = $vtdec->fetch_vt_page($pg_disp, 0, VBI_WST_LEVEL_1p5, 25, 1);
    if (defined $pg) {
-      my $h = $pg->resolve_link($x / 12, $y / 10);
-      if ($h->{type} == Video::Capture::ZVBI::VBI_LINK_PAGE) {
+      # note: char width 12, char height 10*2 due to scaling in XPM conversion
+      my $h = $pg->resolve_link($x / 12, $y / 20);
+      if ($h->{type} == VBI_LINK_PAGE) {
          $pg_sched = $h->{pgno};
          $dec_entry = sprintf "%03X", $pg_sched;
          $redraw = 1;

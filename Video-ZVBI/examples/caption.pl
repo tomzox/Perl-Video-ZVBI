@@ -32,7 +32,7 @@ use strict;
 use IO::Handle;
 use Switch;
 use Tk;
-use Video::Capture::ZVBI;
+use Video::Capture::ZVBI qw(/^VBI_/);
 
 my $vbi;
 my $pgno = -1;
@@ -82,7 +82,7 @@ sub draw_blank {
 }
 
 sub is_transp {
-        (($_[0] >> 16) & 0x0F) == Video::Capture::ZVBI::VBI_TRANSPARENT_SPACE;
+        (($_[0] >> 16) & 0x0F) == VBI_TRANSPARENT_SPACE;
 }
 
 #
@@ -112,11 +112,17 @@ sub draw_row {
                 }
                 # create RGBA image of the character sequence
                 my $vbi_canvas;
-                $pg->draw_cc_page_region (Video::Capture::ZVBI::VBI_PIXFMT_RGBA32_LE,
+                my $fmt;
+                if (Video::Capture::ZVBI::check_lib_version(0,2,26)) {
+                        $fmt = VBI_PIXFMT_PAL8;
+                } else {
+                        $fmt = VBI_PIXFMT_RGBA32_LE;
+                }
+                $pg->draw_cc_page_region ($fmt,
                                           $vbi_canvas, -1, $col, $row, $i - $col, 1);
 
                 # convert into a pixmap via XPM
-                my $img = $tk->Pixmap(-data, $pg->rgba_to_xpm($vbi_canvas));
+                my $img = $tk->Pixmap(-data, $pg->canvas_to_xpm($vbi_canvas, $fmt));
 
                 # finally, display the pixmap in the canvas
                 my $cid = $canvas->createImage($col * CELL_WIDTH + DISP_X_OFF,
@@ -298,23 +304,26 @@ sub init_window {
 sub pes_mainloop {
         my $buffer;
         my $bytes_left;
+        my $sliced;
+        my $n_lines;
+        my $pts;
 
-        if (($bytes_left = sysread $infile, $buffer, 2048) == 2048) {
+        while (read (STDIN, $buffer, 2048)) {
+                my $bytes_left = length($buffer);
+
                 while ($bytes_left > 0) {
-                        my $sliced;
-                        my $n_lines;
-                        my $pts;
 
-                        $n_lines = $dx->demux_cor ($sliced, 64, $pts, &buffer, &bytes_left);
+                        $n_lines = $dx->cor ($sliced, 64, $pts, $buffer, $bytes_left);
                         if ($n_lines > 0) {
+                                print "DECODE $n_lines\n";
                                 $vbi->decode ($sliced, $n_lines, $pts / 90000.0);
                         }
                 }
 
                 $tk->after(20, \&pes_mainloop);
-        } else {
-                print STDERR "\rEnd of stream\n";
+                return;
         }
+        print STDERR "\rEnd of stream\n";
 }
 
 sub old_mainloop {
@@ -322,13 +331,17 @@ sub old_mainloop {
         my $timestamp;
         my $n_lines;
 
+        # one one frame's worth of sliced data from the input stream or file
         ($n_lines, $timestamp, $sliced) = read_sliced ();
         if (defined $n_lines) {
                 my $buf = "";
                 my $set;
+                # pack the read data into the normal slicer output format
+                # (i.e. the format delivered by the librarie's internal slicer)
                 foreach $set (@$sliced) {
                         $buf .= pack "LLa56", @$set;
                 }
+                # pass the full frame's data to the decoder
                 $vbi->decode ($buf, $n_lines, $timestamp);
 
                 # FIXME: reading from STDIN, so $tk->fileevent(readable) could be used instead of polling
@@ -349,7 +362,7 @@ sub cmd {
         my ($n) = @_;
         my $sliced;
 
-        $sliced = pack "LLCCx54", Video::Capture::ZVBI::VBI_SLICED_CAPTION_525,
+        $sliced = pack "LLCCx54", VBI_SLICED_CAPTION_525,
                                   21,
                                   Video::Capture::ZVBI::par8 ($n >> 8),
                                   Video::Capture::ZVBI::par8 ($n & 0x7F);
@@ -571,7 +584,7 @@ sub read_sliced {
         }
 
 	# Time in seconds since last frame.
-        die "invalid timestamp in input\n" unless $buf =~ /^(\d+|(\d*\.\d+))$/;
+        die "invalid timestamp in input\n" unless $buf =~ /^(-?\d+|(-?\d*\.\d+))$/;
 	my $dt = $buf + 0.0;
 	if ($dt < 0.0) {
 		$dt = -$dt;
@@ -600,27 +613,27 @@ sub read_sliced {
 
 		switch ($index) {
 		case 0 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B;
+			$id = VBI_SLICED_TELETEXT_B;
 			$infile->read ($data, 42);
 		}
 		case 1 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_CAPTION_625; 
+			$id = VBI_SLICED_CAPTION_625; 
 			$infile->read ($data, 2);
 		}
 		case 2 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_VPS;
+			$id = VBI_SLICED_VPS;
 			$infile->read ($data, 13);
 		}
 		case 3 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_WSS_625; 
+			$id = VBI_SLICED_WSS_625; 
 			$infile->read ($data, 2);
 		}
 		case 4 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_WSS_CPR1204; 
+			$id = VBI_SLICED_WSS_CPR1204; 
 			$infile->read ($data, 3);
 		}
 		case 7 {
-			$id = Video::Capture::ZVBI::VBI_SLICED_CAPTION_525; 
+			$id = VBI_SLICED_CAPTION_525; 
 			$infile->read($data, 2);
 		}
 		else {
@@ -649,8 +662,7 @@ sub main_func {
         $vbi = Video::Capture::ZVBI::vt::decoder_new ();
         die "Failed to create VT decoder\n" unless defined $vbi;
 
-        $success = $vbi->event_handler_add (Video::Capture::ZVBI::VBI_EVENT_CAPTION,
-                                            \&cc_handler);
+        $success = $vbi->event_handler_add (VBI_EVENT_CAPTION, \&cc_handler);
         die "Failed to add event handler\n" unless $success;
 
         if (-t STDIN) {
@@ -668,7 +680,7 @@ sub main_func {
                 $infile->ungetc($c);
 
                 if (0 == $c) {
-                        $dx = Video::Capture::ZVBI::demux_new ();
+                        $dx = Video::Capture::ZVBI::dvbdemux::new ();
                         die "Failed to create DVB demuxer\n" unless defined $dx;
 
                         $tk->after(20, \&pes_mainloop);
