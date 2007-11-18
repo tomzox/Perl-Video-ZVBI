@@ -2,7 +2,7 @@
 #
 #  VBI proxy test client
 #
-#  Copyright (C) 2003,2004,2006 Tom Zoerner
+#  Copyright (C) 2003,2004,2006,2007 Tom Zoerner
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License version 2 as
@@ -28,7 +28,7 @@
 #    This Perl script has been translated from proxy-test.c which is
 #    located in the test directory of the libzvbi package.
 #
-#  $Id$
+#  $Id: proxy-test.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 #
 
 use blib;
@@ -36,11 +36,15 @@ use strict;
 use Socket;
 use POSIX;
 use Fcntl;
-use Video::Capture::ZVBI qw(/^VBI_*);
+use Video::ZVBI qw(/^VBI_/);
 
-use constant VIDIOCGCHAN = 0xC0307602;  # from linux/videodev.h
-use constant VIDIOCSCHAN = 0x40307603;
-use constant VIDIOCSFREQ = 0x4008760F;
+use constant VIDIOCGCAP => 0x803C7601;  # from linux/videodev.h
+use constant VIDIOCGCHAN => 0xC0307602;
+use constant VIDIOCSCHAN => 0x40307603;
+use constant VIDIOCGFREQ => 0x8008760E;
+use constant VIDIOCSFREQ => 0x4008760F;
+use constant VIDIOCGTUNER => 0xC0407604;
+use constant VIDIOCSTUNER => 0x40407605;
 
 my $opt_device = "/dev/vbi0";
 my $opt_buf_count = 5;
@@ -163,6 +167,14 @@ sub ProxyEventCallback {
 
          $proxy->channel_notify($flags, $opt_scanning);
       }
+      if ($ev_mask & VBI_PROXY_EV_CHN_CHANGED) {
+         my $lfreq = 0;
+         my $buf = pack("L", $lfreq);
+         if ($proxy->device_ioctl(VIDIOCGFREQ, $buf) == 0) {
+            $lfreq = unpack("L", $buf);
+         }
+         print STDERR "ProxyEventCallback: TV channel changed: $lfreq\n";
+      }
       if ($ev_mask & VBI_PROXY_EV_NORM_CHANGED) {
          print STDERR "ProxyEventCallback: TV norm changed\n";
          $update_services = 1;
@@ -179,7 +191,7 @@ sub PrintTeletextData {
 
    my $mag    =    0xF;
    my $pkgno  =   0xFF;
-   $tmp1 = Video::Capture::ZVBI::unham16p($data);
+   $tmp1 = Video::ZVBI::unham16p($data);
    if ($tmp1 >= 0) {
       $pkgno = ($tmp1 >> 3) & 0x1f;
       $mag   = $tmp1 & 7;
@@ -187,18 +199,18 @@ sub PrintTeletextData {
    }
 
    if ($pkgno != 0) {
-      Video::Capture::ZVBI::unpar_str($data);
+      Video::ZVBI::unpar_str($data);
       $data =~ s#[\x00-\x1F]# #g;
       printf("line %3d id=%d pkg %X.%03X: '%s'\n", $line, $id, $mag, $pkgno, substr($data, 2, 40));
    } else {
       # it's a page header: decode page number and sub-page code
-      $tmp1 = Video::Capture::ZVBI::unham16p($data, 2);
-      $tmp2 = Video::Capture::ZVBI::unham16p($data, 4);
-      $tmp3 = Video::Capture::ZVBI::unham16p($data, 6);
+      $tmp1 = Video::ZVBI::unham16p($data, 2);
+      $tmp2 = Video::ZVBI::unham16p($data, 4);
+      $tmp3 = Video::ZVBI::unham16p($data, 6);
       my $pageNo = $tmp1 | ($mag << 8);
       my $sub    = ($tmp2 | ($tmp3 << 8)) & 0x3f7f;
 
-      Video::Capture::ZVBI::unpar_str($data);
+      Video::ZVBI::unpar_str($data);
       $data =~ s#[\x00-\x1F]# #g;
       printf("line %3d id=%d page %03X.%04X: '%s'\n", $line, $id, $pageNo, $sub, substr($data, 2+8, 40-8));
    }
@@ -227,7 +239,7 @@ sub PrintVpsData {
    #   # special case: "ARD/ZDF Gemeinsames Vormittagsprogramm"
    #   $cni = ($data[$VPSOFF+5] & 0x20) ? 0xDC1 : 0xDC2;
    #}
-   $cni = Video::Capture::ZVBI::decode_vps_cni($indata);
+   $cni = Video::ZVBI::decode_vps_cni($indata);
 
    if (($cni != 0) && ($cni != 0xfff)) {
 
@@ -302,7 +314,7 @@ sub read_service_string {
 #
 my $usage =
                    "Usage: $0 [ Options ] service ...\n".
-                   "Supported services         : ttx | vps | wss | cc | raw\n".
+                   "Supported services         : ttx | vps | wss | cc | raw | null\n".
                    "Supported options:\n".
                    "       -dev <path>         : device path\n".
                    "       -api <type>         : v4l API: proxy|v4l2|v4l\n".
@@ -428,15 +440,15 @@ sub main {
    $proxy = undef;
    $cap = undef;
    if ($opt_api eq "v4l2") {
-      $cap = Video::Capture::ZVBI::capture::v4l2_new($opt_device, $opt_buf_count, $cur_services, $opt_strict, $err, $opt_debug_level);
+      $cap = Video::ZVBI::capture::v4l2_new($opt_device, $opt_buf_count, $cur_services, $opt_strict, $err, $opt_debug_level);
    }
    if ($opt_api eq "v4l") {
-      $cap = Video::Capture::ZVBI::capture::v4l_new($opt_device, 0, $cur_services, $opt_strict, $err, $opt_debug_level);
+      $cap = Video::ZVBI::capture::v4l_new($opt_device, 0, $cur_services, $opt_strict, $err, $opt_debug_level);
    }
    if ($opt_api eq "proxy") {
-      $proxy = Video::Capture::ZVBI::proxy::create($opt_device, "proxy-test", 0, $err, $opt_debug_level);
+      $proxy = Video::ZVBI::proxy::create($opt_device, "proxy-test", 0, $err, $opt_debug_level);
       if ($proxy) {
-         $cap = Video::Capture::ZVBI::capture::proxy_new($proxy, $opt_buf_count, 0, $cur_services, $opt_strict, $err);
+         $cap = Video::ZVBI::capture::proxy_new($proxy, $opt_buf_count, 0, $cur_services, $opt_strict, $err);
          $proxy->set_callback(\&ProxyEventCallback);
       } else {
          undef $proxy;
@@ -465,8 +477,8 @@ sub main {
       # initialize services for raw capture
       if (($opt_services & (VBI_SLICED_VBI_625 | VBI_SLICED_VBI_525)) != 0) {
          #my $par = $cap->parameters();
-         #$raw = Video::Capture::ZVBI::rawdec::new($par);
-         $raw = Video::Capture::ZVBI::rawdec::new($cap);
+         #$raw = Video::ZVBI::rawdec::new($par);
+         $raw = Video::ZVBI::rawdec::new($cap);
          $raw->add_services($all_services_525 | $all_services_625, 0);
       }
 
@@ -517,7 +529,7 @@ sub main {
                } elsif (($res > 0) && (defined($sliced))) {
                   my $ttx_lines = 0;
                   for (my $idx = 0; $idx < $line_count; $idx++) {
-                     my @a = Video::Capture::ZVBI::get_sliced_line($sliced, $idx);
+                     my @a = Video::ZVBI::get_sliced_line($sliced, $idx);
                      if ($a[1] & VBI_SLICED_TELETEXT_B) {
                         PrintTeletextData($a[0], $a[2], $a[1]);
                         $ttx_lines++;
@@ -557,7 +569,7 @@ sub main {
                   }
 
                   for (my $idx = 0; $idx < $line_count; $idx++) {
-                     my @a = Video::Capture::ZVBI::get_sliced_line($sliced, $idx);
+                     my @a = Video::ZVBI::get_sliced_line($sliced, $idx);
                      if ($a[1] & VBI_SLICED_TELETEXT_B) {
                         PrintTeletextData($a[0], $a[2], $a[1]);
                      } elsif ($a[1] & VBI_SLICED_VPS) {

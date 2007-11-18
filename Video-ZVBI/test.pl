@@ -14,12 +14,14 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id$
+# $Id: test.pl,v 1.1 2007/11/18 18:48:51 tom Exp tom $
 #
 
 use blib;
-use Video::Capture::ZVBI;
+use Video::ZVBI;
 
 # Well, so far we only test if the module loads correctly.
 # For manual testing, see the examples/ sub-directory.
+
+1;
 

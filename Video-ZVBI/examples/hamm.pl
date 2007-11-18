@@ -20,14 +20,14 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# Perl $Id$
+# Perl $Id: hamm.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 # ZVBI #Id: hamm.c,v 1.2 2006/03/17 13:37:05 mschimek Exp #
 
 # Automated test of the odd parity and Hamming test/set routines.
 
 use blib;
-use Video::Capture::ZVBI;
 use strict;
+use Video::ZVBI;
 
 sub sizeof { 4 }
 sub CHAR_BIT { 8 }
@@ -83,26 +83,26 @@ sub main_func {
                         }
                 }
 
-		die unless ($r == Video::Capture::ZVBI::rev8 ($n));
+		die unless ($r == Video::ZVBI::rev8 ($n));
 
 		if (parity ($n & 0xFF)) {
-			die unless (Video::Capture::ZVBI::unpar8 ($n) == cast_int($n & 127));
+			die unless (Video::ZVBI::unpar8 ($n) == cast_int($n & 127));
 		} else {
-			die unless (-1 == Video::Capture::ZVBI::unpar8 ($n));
+			die unless (-1 == Video::ZVBI::unpar8 ($n));
                 }
 
-		die unless (Video::Capture::ZVBI::unpar8 (Video::Capture::ZVBI::par8 ($n)) >= 0);
+		die unless (Video::ZVBI::unpar8 (Video::ZVBI::par8 ($n)) >= 0);
 
-		Video::Capture::ZVBI::par_str ($buf);
-		die unless (Video::Capture::ZVBI::unpar_str ($buf) >= 0);
+		Video::ZVBI::par_str ($buf);
+		die unless (Video::ZVBI::unpar_str ($buf) >= 0);
                 @intbuf = unpack "C3", $buf;
 		die unless (0 == (($intbuf[0] | $intbuf[1] | $intbuf[2]) & 0x80));
 
-		$intbuf[1] = Video::Capture::ZVBI::par8 ($intbuf[1]);
+		$intbuf[1] = Video::ZVBI::par8 ($intbuf[1]);
 		$intbuf[2] = $intbuf[1] ^ 0x80;
 		$buf = pack("C3", @intbuf);
 
-		die unless (Video::Capture::ZVBI::unpar_str ($buf) < 0);
+		die unless (Video::ZVBI::unpar_str ($buf) < 0);
                 @intbuf = unpack "C3", $buf;
 		die unless ($intbuf[2] == ($intbuf[1] & 0x7F));
 	}
@@ -125,20 +125,20 @@ sub main_func {
 		if ($A && $B && $C) {
 			$nn = $D ? $n : ($n ^ 0x40);
 
-			die unless (Video::Capture::ZVBI::ham8 ($d) == ($nn & 255));
-			die unless (Video::Capture::ZVBI::unham8 ($nn) == $d);
+			die unless (Video::ZVBI::ham8 ($d) == ($nn & 255));
+			die unless (Video::ZVBI::unham8 ($nn) == $d);
 		} elsif (!$D) {
-			$dd = Video::Capture::ZVBI::unham8 ($n);
+			$dd = Video::ZVBI::unham8 ($n);
 			die unless ($dd >= 0 && $dd <= 15);
 
-			$nn = Video::Capture::ZVBI::ham8 ($dd);
+			$nn = Video::ZVBI::ham8 ($dd);
 			die unless (hamming_distance ($n & 255, $nn) == 1);
 		} else {
-			die unless (Video::Capture::ZVBI::unham8 ($n) == -1);
+			die unless (Video::ZVBI::unham8 ($n) == -1);
 		}
 
-		#Video::Capture::ZVBI::ham16 (buf, $n);
-		#die unless (Video::Capture::ZVBI::unham16 (buf) == (int)($n & 255));
+		#Video::ZVBI::ham16 (buf, $n);
+		#die unless (Video::ZVBI::unham16 (buf) == (int)($n & 255));
 	}
         print "OK\n";
         print "Testing Hamming-24/18...";
@@ -159,9 +159,9 @@ sub main_func {
 		      + (($i & 0x7F0000) >> (17 - 12)));
 		
 		if ($A && $B && $C && $D && $E) {
-			die unless (Video::Capture::ZVBI::unham24p ($buf) == $d);
+			die unless (Video::ZVBI::unham24p ($buf) == $d);
 		} elsif ($F) {
-			die unless (Video::Capture::ZVBI::unham24p ($buf) < 0);
+			die unless (Video::ZVBI::unham24p ($buf) < 0);
 		} else {
 			my $err = (($E << 4) | ($D << 3)
 			         | ($C << 2) | ($B << 1) | $A) ^ 0x1F;
@@ -169,7 +169,7 @@ sub main_func {
 			die unless ($err > 0);
 
 			if ($err >= 24) {
-				die unless (Video::Capture::ZVBI::unham24p ($buf) < 0);
+				die unless (Video::ZVBI::unham24p ($buf) < 0);
 				next;
 			}
 
@@ -189,7 +189,7 @@ sub main_func {
 			      + (($ii & 0x007F00) >> (9 - 5))
 			      + (($ii & 0x7F0000) >> (17 - 12)));
 
-			die unless (Video::Capture::ZVBI::unham24p ($buf) == $d);
+			die unless (Video::ZVBI::unham24p ($buf) == $d);
 		}
 
                 print "." if ($i & 0x00FFFF) == 0;

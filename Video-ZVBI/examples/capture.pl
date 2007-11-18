@@ -20,7 +20,7 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# Perl $Id$
+# Perl $Id: capture.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 # ZVBI #Id: capture.c,v 1.26 2006/10/08 06:19:48 mschimek Exp #
 
 use blib;
@@ -28,7 +28,7 @@ use strict;
 use Getopt::Long;
 use POSIX;
 use IO::Handle;
-use Video::Capture::ZVBI qw(/^VBI_/);
+use Video::ZVBI qw(/^VBI_/);
 
 my $cap;
 my $par;
@@ -110,7 +110,7 @@ sub decode_vps {
 
         $outfile->print("\nVPS:\n");
 
-        my $c = Video::Capture::ZVBI::rev8 ($buf[1]);
+        my $c = Video::ZVBI::rev8 ($buf[1]);
 
         if ($c & 0x80) {
                 $pr_label = substr($label, 0, $label_off);
@@ -219,7 +219,7 @@ sub decode_sliced {
                 $outfile->printf("Sliced time: %f\n", $time);
 
                 for (my $i = 0; $i < $lines; $i++) {
-                        ($data, $id, $line) = Video::Capture::ZVBI::get_sliced_line($sliced, $i);
+                        ($data, $id, $line) = Video::ZVBI::get_sliced_line($sliced, $i);
                         $outfile->printf("%04x %3d > ", $id, $line);
 
                         for (my $j = 0; $j < length $data; ++$j) {
@@ -228,7 +228,7 @@ sub decode_sliced {
 
                         $outfile->print(" ");
 
-                        Video::Capture::ZVBI::unpar_str($data);
+                        Video::ZVBI::unpar_str($data);
                         $data =~ s#[\x00-\x1F\x7F]#.#g;
                         $outfile->print($data);
 
@@ -237,7 +237,7 @@ sub decode_sliced {
         }
 
         for (my $i2 = 0; $i2 < $lines; $i2++) {
-                ($data, $id, $line) = Video::Capture::ZVBI::get_sliced_line($sliced, $i2);
+                ($data, $id, $line) = Video::ZVBI::get_sliced_line($sliced, $i2);
 
                 if ($id == 0) {
                         next;
@@ -286,7 +286,7 @@ sub binary_sliced {
         }
 
         for ($i = 0; $i < $lines; $i++) {
-                my ($data, $id, $line) = Video::Capture::ZVBI::get_sliced_line($sliced, $i);
+                my ($data, $id, $line) = Video::ZVBI::get_sliced_line($sliced, $i);
                 if (defined($ServiceWidth{$id}) && ($ServiceWidth{$id}->[0] > 0)) {
                         $outfile->printf("%c%c%c", $ServiceWidth{$id}->[1],
                                          $line & 0xFF, $line >> 8);
@@ -338,7 +338,7 @@ sub mainloop {
                 } elsif ($r == 1) {
                         # ok
                 } else {
-                        die "Unexpeted capture result code $r\n";
+                        die "Unexpected capture result code $r\n";
                 }
 
                 if ($dump) {
@@ -413,13 +413,13 @@ sub main_func {
                     VBI_SLICED_WSS_CPR1204;
 
         if ($do_sim) {
-                #$cap = Video::Capture::ZVBI::sim_new ($scanning, $services, 0, !$desync);
+                #$cap = Video::ZVBI::sim_new ($scanning, $services, 0, !$desync);
                 $par = $cap->parameters();
                 die unless defined $par;
         } else {
                 while (1) {
                         if (-1 != $pid) {
-                                $cap = Video::Capture::ZVBI::capture::dvb_new ($dev_name,
+                                $cap = Video::ZVBI::capture::dvb_new ($dev_name,
                                                            $scanning,
                                                            $services,
                                                            $strict,
@@ -434,7 +434,7 @@ sub main_func {
                         }
 
                         if (!$api_v4l) {
-                                $cap = Video::Capture::ZVBI::capture::v4l2_new ($dev_name,
+                                $cap = Video::ZVBI::capture::v4l2_new ($dev_name,
                                                             5, # buffers
                                                             $services,
                                                             $strict,
@@ -447,7 +447,7 @@ sub main_func {
                         }
                         
                         if (!$api_v4l2) {
-                                $cap = Video::Capture::ZVBI::capture::v4l_new ($dev_name,
+                                $cap = Video::ZVBI::capture::v4l_new ($dev_name,
                                                            $scanning,
                                                            $services,
                                                            $strict,
@@ -460,7 +460,7 @@ sub main_func {
 
                         # BSD interface
                         if (1) {
-                                $cap = Video::Capture::ZVBI::capture::bktr_new ($dev_name,
+                                $cap = Video::ZVBI::capture::bktr_new ($dev_name,
                                                             $scanning,
                                                             $services,
                                                             $strict,

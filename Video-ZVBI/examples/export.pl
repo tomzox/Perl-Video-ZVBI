@@ -20,22 +20,22 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# Perl $Id$
+# Perl $Id: export.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 # ZVBI #Id: export.c,v 1.13 2005/10/04 10:06:11 mschimek Exp #
 
 use blib;
 use strict;
 use POSIX;
 use IO::Handle;
-use Video::Capture::ZVBI qw(/^VBI_/);
+use Video::ZVBI qw(/^VBI_/);
 
 my $vbi;
-my $quit = 0;
-my $pgno;
+my $dx;
 my $ex;
 my $extension;
+my $pgno;
+my $quit = 0;
 my $cr;
-my $dx;
 
 
 sub handler {
@@ -72,7 +72,7 @@ sub handler {
 
                 $io->open($name, "w") || die "create $name: $!\n";
         } else {
-                $io->fdopen(fileno(STDOUT), "w")
+                $io->fdopen(fileno(STDOUT), "w");
         }
 
         if (!$ex->stdio($io, $page)) {
@@ -81,6 +81,17 @@ sub handler {
         } else {
                 print STDERR "done\n";
         }
+        ##my $img = $ex->alloc($page);
+        #my $img = "";
+        #my $s = $ex->mem($img, $page);
+        #die "Export failed: ". $ex->errstr() ." ($s)\n" if $s < 0;
+        #$img = "." x $s;
+        #$s = $ex->mem($img, $page);
+        #die "Export failed: ". $ex->errstr() ." ($s)\n" if $s < 0;
+        #die "Export failed: Buffer too small (need $s, have ".length($img).")\n" if $s > length($img);
+        #print $io $img;
+        #$io->close();
+        #print STDERR "Image size: ".length($img)."\n";
 
         undef $page;
 
@@ -89,8 +100,7 @@ sub handler {
         }
 }
 
-sub pes_mainloop
-{
+sub pes_mainloop {
         my $buffer;
         my $sliced;
         my $lines;
@@ -109,11 +119,10 @@ sub pes_mainloop
                 }
         }
 
-        printf STDERR "\rEnd of stream, page %03x not found\n", $pgno;
+        printf STDERR "\rEnd of stream, page %03x not found\n", $pgno unless $quit;
 }
 
-sub old_mainloop
-{
+sub old_mainloop {
         my $opt_device = "/dev/vbi0";
         my $opt_buf_count = 5;
         my $opt_services = VBI_SLICED_TELETEXT_B;
@@ -121,7 +130,7 @@ sub old_mainloop
         my $opt_debug_level = 0;
 
         my $err;
-        my $cap = Video::Capture::ZVBI::capture::v4l2_new($opt_device, $opt_buf_count, $opt_services, $opt_strict, $err, $opt_debug_level) || die "V4l open: $!\n";
+        my $cap = Video::ZVBI::capture::v4l2_new($opt_device, $opt_buf_count, $opt_services, $opt_strict, $err, $opt_debug_level) || die "V4l open: $!\n";
 
         while (!$quit) {
                 my $sliced;
@@ -130,21 +139,20 @@ sub old_mainloop
 
                 #my $res = $cap->read_sliced($sliced, $n_lines, $timestamp, 1000);
                 my $res = $cap->pull_sliced($sliced, $n_lines, $timestamp, 1000);
-                die if $res < 0;
+                die "Capture error: $!\n" if $res < 0;
 
                 $vbi->decode($sliced, $n_lines, $timestamp);
         }
 
-        printf STDERR "\rEnd of stream, page %03x not found\n", $pgno;
+        printf STDERR "\rEnd of stream, page %03x not found\n", $pgno unless $quit;
 }
 
-sub main_func
-{
+sub main_func {
         my $module;
         my $t;
 
         if ($#ARGV < 1) {
-                print STDERR "Usage: $0 module[;options] pgno <vbi_data >file\n".
+                print STDERR "Usage: $0 \"module[;option=value]\" pgno <vbi_data >file\n".
                                 "module eg. \"text\" or \"ppm\", pgno eg. 100 (hex)\n";
                 exit(-1);
         }
@@ -160,7 +168,7 @@ sub main_func
         $pgno = hex($ARGV[1]);
         die "Invalid page number: $ARGV[1]\n" if ($pgno < 0x100) || ($pgno > 0x8FF);
 
-        $ex = Video::Capture::ZVBI::export::new($module, $t);
+        $ex = Video::ZVBI::export::new($module, $t);
         die "Failed to open export module '$module': $t\n" unless defined $ex;
 
         my $xi = $ex->info_export();
@@ -169,18 +177,20 @@ sub main_func
         $extension =~ s#,.*##;
         undef $xi;
 
-        $vbi = Video::Capture::ZVBI::vt::decoder_new();
+        $vbi = Video::ZVBI::vt::decoder_new();
         die "Failed to create VT decoder\n" unless defined $vbi;
 
         my $ok = $vbi->event_handler_add(VBI_EVENT_TTX_PAGE, \&handler); 
         die "Failed to install VT event handler\n" unless $ok;
 
+        #my $infile = new IO::Handle;
+        #$infile->fdopen(fileno(STDIN), "r");
+        #my $c = ord($infile->getc() || 1);
+        #$infile->ungetc($c);
         my $c = 1;
-        #my $c = getc();
-        #IO::Handle::ungetc($c);
 
         if (0 == $c) {
-                $dx = Video::Capture::ZVBI::dvbdemux::new ();
+                $dx = Video::ZVBI::dvb_demux::pes_new ();
                 die unless defined $dx;
 
                 pes_mainloop ();

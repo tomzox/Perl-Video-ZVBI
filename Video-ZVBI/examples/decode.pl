@@ -21,7 +21,7 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #/
 
-# Perl $Id$
+# Perl $Id: decode.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 # libzvbi #Id: decode.c,v 1.19 2006/10/06 19:23:15 mschimek Exp #
 
 use blib;
@@ -31,7 +31,7 @@ use Switch;
 use POSIX;
 use IO::Handle;
 use Encode;
-use Video::Capture::ZVBI qw(/^VBI_/);
+use Video::ZVBI qw(/^VBI_/);
 
 my $source_is_pes       = 0; # ATSC/DVB
 
@@ -158,7 +158,7 @@ sub _vbi_pfc_block_dump {
 	if ($binary) {
 		#$io->write ($block, length $block);
 	} else {
-                Video::Capture::ZVBI::unpar_str ($block);
+                Video::ZVBI::unpar_str ($block);
                 $block =~ s#[\x00-\x1F\x7F]#.#g;
                 # missing: insert \n every 75 chars
 
@@ -172,7 +172,7 @@ sub put_cc_char {
 
         # All caption characters are representable in UTF-8
         my $c = (($c1 << 8) + $c2) & 0x777F;
-        my $ucs2_str = Video::Capture::ZVBI::caption_unicode ($c);  # !to_upper
+        my $ucs2_str = Video::ZVBI::caption_unicode ($c);  # !to_upper
 
         print $ucs2_str;
 }
@@ -318,8 +318,8 @@ sub caption {
             && (21 == $line || 284 == $line # NTSC
                 || 22 == $line)) { # PAL
 
-                my $c1 = Video::Capture::ZVBI::unpar8 ($buffer[0]);
-                my $c2 = Video::Capture::ZVBI::unpar8 ($buffer[1]);
+                my $c1 = Video::ZVBI::unpar8 ($buffer[0]);
+                my $c2 = Video::ZVBI::unpar8 ($buffer[1]);
 
                 if (($c1 | $c2) < 0) {
                         printf "Parity error in CC line=%u ".
@@ -338,7 +338,7 @@ sub caption {
                         $text = pack "C2", $c1, $c2;
 
                         # Error ignored.
-                        my $utf = Video::Capture::ZVBI::iconv_caption ($text, ord("?"));
+                        my $utf = Video::ZVBI::iconv_caption ($text, ord("?"));
                         # suppress warnings about wide characters
                         #$utf = encode("ISO-8859-1", $utf, Encode::FB_DEFAULT);
 
@@ -404,7 +404,7 @@ sub dump_bytes {
         # For Teletext: Not all characters are representable
         # in ASCII or even UTF-8, but at this stage we don't
         # know the Teletext code page for a proper conversion.
-        Video::Capture::ZVBI::unpar_str ($buffer);
+        Video::ZVBI::unpar_str ($buffer);
         $buffer =~ s#[\x00-\x1F\x7F]#.#g;
 
         print ">". substr($buffer, 0, $n_bytes) ."<\n";
@@ -510,7 +510,7 @@ sub calc_spa {
         my $spa = 0;
 
         for (my $i = 0; $i < $spa_length; ++$i) {
-                my $h = Video::Capture::ZVBI::unham8($ord[4 + $i]);
+                my $h = Video::ZVBI::unham8($ord[4 + $i]);
                 $spa |= ($h << (4 * $i));
         }
         return $spa;
@@ -518,7 +518,7 @@ sub calc_spa {
 
 sub packet_idl {
         my ($buffer, $channel) = @_;
-        my @ord = unpack "C6", $buffer;
+        my @ord = unpack "C10", $buffer;
 
         printf "IDL ch=%u ", $channel;
 
@@ -533,9 +533,9 @@ sub packet_idl {
         }
         case [5, 6, 13, 14] {
                 my $pa;
-                $pa = Video::Capture::ZVBI::unham8 ($ord[3]);
-                $pa |= Video::Capture::ZVBI::unham8 ($ord[4]) << 4;
-                $pa |= Video::Capture::ZVBI::unham8 ($ord[5]) << 8;
+                $pa = Video::ZVBI::unham8 ($ord[3]);
+                $pa |= Video::ZVBI::unham8 ($ord[4]) << 4;
+                $pa |= Video::ZVBI::unham8 ($ord[5]) << 8;
 
                 if ($pa < 0) {
                         print "Hamming error in Datavideo packet-address byte.\n";
@@ -549,7 +549,7 @@ sub packet_idl {
         }
         case [8, 9, 10, 11, 15] {
                 my $ft; # format type
-                if (($ft = Video::Capture::ZVBI::unham8 ($ord[2])) < 0) {
+                if (($ft = Video::ZVBI::unham8 ($ord[2])) < 0) {
                         printf "Hamming error in IDL format ".
                                   "A or B format-type byte.\n";
                         return;
@@ -560,7 +560,7 @@ sub packet_idl {
                         my $spa_length;
                         my $spa; # service packet address
 
-                        if (($ial = Video::Capture::ZVBI::unham8 ($ord[3])) < 0) {
+                        if (($ial = Video::ZVBI::unham8 ($ord[3])) < 0) {
                                 print "Hamming error in IDL format ".
                                           "A interpretation-and-address-".
                                           "length byte.\n";
@@ -589,7 +589,7 @@ sub packet_idl {
 
                         $an = ($ft >> 2);
 
-                        if (($ai = Video::Capture::ZVBI::unham8 ($ord[3])) < 0) {
+                        if (($ai = Video::ZVBI::unham8 ($ord[3])) < 0) {
                                 print "Hamming error in IDL format ".
                                           "B application-number byte.\n";
                                 return;
@@ -624,7 +624,7 @@ sub teletext {
                 return;
         }
 
-        my $pmag = Video::Capture::ZVBI::unham16p ($buffer);
+        my $pmag = Video::ZVBI::unham16p ($buffer);
         if ($pmag < 0) {
                 print "Hamming error in Teletext packet number.\n";
                 return;
@@ -637,7 +637,7 @@ sub teletext {
         my $packet = $pmag >> 3;
 
         if (8 == $magazine && 30 == $packet) {
-                my $designation = Video::Capture::ZVBI::unham8 ($ord[2]);
+                my $designation = Video::ZVBI::unham8 ($ord[2]);
                 if ($designation < 0 ) {
                         print "Hamming error in Teletext packet 8/30 designation byte.\n";
                         return;
@@ -692,7 +692,7 @@ sub vps {
                         return;
                 }
 
-                $cni = Video::Capture::ZVBI::decode_vps_cni ($inbuf);
+                $cni = Video::ZVBI::decode_vps_cni ($inbuf);
                 if (!defined $cni) {
                         printf "Error in VPS packet CNI.\n";
                         return;
@@ -720,7 +720,7 @@ sub vps {
         if ($option_decode_vps_other) {
                 my $l = ($line != 16);
 
-                my $c = Video::Capture::ZVBI::rev8 ($ord[1]);
+                my $c = Video::ZVBI::rev8 ($ord[1]);
 
                 if ($c & 0x80) {
                         $pr_label[$l] = substr($label[$l], 0, $label_off[$l]);
@@ -818,6 +818,27 @@ sub decode_vbi {
         }
 }
 
+sub dvb_feed_cb {
+        my ($sliced_buf, $n_lines, $pts, $user_data) = @_;
+
+        if ($n_lines > 0) {
+                # pull all data lines out of the packed slicer buffer
+                # since we want to process them by Perl code
+                # (something we'd normally like to avoid, as it's slow)
+                # (see export.pl for an efficient use case)
+                my @sliced = ();
+                foreach (0 .. $n_lines-1) {
+                        my $x = [Video::ZVBI::get_sliced_line($sliced_buf, $_)];
+                        push @sliced, $x;
+                }
+                decode_vbi (\@sliced, $n_lines,
+                        0, # sample_time
+                        $pts); # stream_time
+        }
+        # return TRUE in case we're invoked as callback via feed()
+        1;
+}
+
 sub pes_mainloop {
         my $buffer;
         my $left;
@@ -827,23 +848,13 @@ sub pes_mainloop {
 
         while (read (STDIN, $buffer, 2048)) {
                 $left = length $buffer;
+
+                #$n_lines = $dvb->feed ($buffer); #ALT
+                #next; #ALT
+
                 while ($left > 0) {
                         $n_lines = $dvb->cor ($sliced_buf, 64, $pts, $buffer, $left);
-                        if ($n_lines > 0) {
-                                # pull all data lines out of the packed slicer buffer
-                                # since we want to process them by Perl code
-                                # (something we'd normally like to avoid, as it's slow)
-                                # (see export.pl for an efficient use case)
-                                my @sliced = ();
-                                foreach (0 .. $n_lines-1) {
-                                        my $x =
-                                             [Video::Capture::ZVBI::get_sliced_line($sliced_buf, $_)];
-                                        push @sliced, $x;
-                                }
-                                decode_vbi (\@sliced, $n_lines,
-                                        0, # sample_time
-                                        $pts); # stream_time
-                        }
+                        dvb_feed_cb($sliced_buf, $n_lines, $pts);
                 }
         }
 
@@ -957,21 +968,21 @@ sub main_func {
         }
 
         if (0 != $option_pfc_pgno) {
-                $pfc = Video::Capture::ZVBI::pfcdemux::new ($option_pfc_pgno,
+                $pfc = Video::ZVBI::pfc_demux::new ($option_pfc_pgno,
                                          $option_pfc_stream,
                                          \&page_function_clear_cb);
                 die unless defined $pfc;
         }
 
         if (0 != $option_idl_channel) {
-                $idl = Video::Capture::ZVBI::idldemux::new ($option_idl_channel,
+                $idl = Video::ZVBI::idl_demux::new ($option_idl_channel,
                                             $option_idl_address,
                                             \&idl_format_a_cb);
                 die unless defined $idl;
         }
 
         if ($option_decode_xds) {
-                $xds = Video::Capture::ZVBI::xdsdemux::new (\&xds_cb);
+                $xds = Video::ZVBI::xds_demux::new (\&xds_cb);
                 die unless defined $xds;
         }
 
@@ -980,11 +991,12 @@ sub main_func {
 
         $infile = new IO::Handle;
         $infile->fdopen(fileno(STDIN), "r");
-        my $c = ord($infile->getc());
+        my $c = ord($infile->getc() || 1);
         $infile->ungetc($c);
 
         if (0 == $c || $source_is_pes) {
-                $dvb = Video::Capture::ZVBI::dvbdemux::new ();
+                #$dvb = Video::ZVBI::dvb_demux::pes_new (\&dvb_feed_cb); #ALT
+                $dvb = Video::ZVBI::dvb_demux::pes_new ();
                 die unless defined $dvb;
 
                 pes_mainloop ();
@@ -1002,7 +1014,7 @@ sub main_func {
 }
 
 #sub vlog  { print "LOG ".join(",",@_); }
-#Video::Capture::ZVBI::set_log_fn(VBI_LOG_DEBUG, \&vlog, "\n");
+#Video::ZVBI::set_log_fn(VBI_LOG_DEBUG, \&vlog, "\n");
 
 main_func();
 

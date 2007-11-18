@@ -20,7 +20,7 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# Perl $Id$
+# Perl $Id: network.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 # ZVBI #Id: network.c,v 1.2 2006/10/27 04:52:08 mschimek Exp #
 
 # This example shows how to identify a network from data transmitted
@@ -28,17 +28,21 @@
 
 use blib;
 use strict;
+use Getopt::Long;
 use Encode;
-use Video::Capture::ZVBI qw(/^VBI_/);
+use Video::ZVBI qw(/^VBI_/);
 
 my $cap;
 my $dec;
 my $quit;
 
+my $option_vps = 0;
+my $option_8301 = 0;
+my $option_8302 = 0;
+my $option_help = 0;
 my $services;
 
-sub handler
-{
+sub handler {
         my($ev_type, $ev, $user_data) = @_;
 
 	my $event_name;
@@ -51,7 +55,6 @@ sub handler
 
 	if ($ev_type == VBI_EVENT_NETWORK) {
 		$event_name = "VBI_EVENT_NETWORK";
-		$quit = 1;
 
 	} elsif ($ev_type == VBI_EVENT_NETWORK_ID) {
 		$event_name = "VBI_EVENT_NETWORK_ID";
@@ -84,10 +87,13 @@ sub handler
 		$ev->{cni_vps},
 		$ev->{cni_8301},
 		$ev->{cni_8302};
+
+        $quit = 1 if $ev->{cni_vps} != 0 && $option_vps;
+        $quit = 1 if $ev->{cni_8301} != 0 && $option_8301;
+        $quit = 1 if $ev->{cni_8302} != 0 && $option_8302;
 }
 
-sub mainloop
-{
+sub mainloop {
 	my $timeout;
 	my $sliced_buffer;
 	my $n_frames;
@@ -133,20 +139,42 @@ sub mainloop
 	print "No network ID received or network unknown.\n";
 }
 
+sub usage {
+        print STDERR "$0 - network identification test\n".
+                     "Options:\n".
+                     "\t--vps\tStop after receiving VPS\n".
+                     "\t--8301\tStop after receiving packet 8/30/1\n".
+                     "\t--8302\tStop after receiving packet 8/30/2\n".
+                     "\t--help\tPrint this usage info\n";
+        exit(1);
+}
+
+my %CmdOpts = (
+        "vps" =>       \$option_vps,
+        "8301" =>      \$option_8301,
+        "8302" =>      \$option_8302,
+);
+
 sub main_func
 {
 	my $errstr;
 	my $success;
+
+        GetOptions(%CmdOpts) || usage();
+
+        if (!$option_vps && !$option_8301 && !$option_8302) {
+                $option_vps = $option_8301 = $option_8302 = 1;
+        }
 
 	$services = (VBI_SLICED_TELETEXT_B |
 		     VBI_SLICED_VPS |
 		     VBI_SLICED_CAPTION_525);
 
         # open VBI device (buffers:=5, strict:=0, verbose:=FALSE
-	$cap = Video::Capture::ZVBI::capture::v4l2_new ("/dev/vbi0", 5, $services, 0, $errstr, 0);
+	$cap = Video::ZVBI::capture::v4l2_new ("/dev/vbi0", 5, $services, 0, $errstr, 0);
         die "Cannot capture VBI data with V4L2 interface: $errstr\n" unless $cap;
 
-	$dec = Video::Capture::ZVBI::vt::decoder_new ();
+	$dec = Video::ZVBI::vt::decoder_new ();
 	die "Failed to create VT decoder\n" unless $dec;
 
 	$success = $dec->event_handler_add ( (VBI_EVENT_NETWORK |
@@ -155,10 +183,7 @@ sub main_func
 	die "Failed to install event handler\n" unless $success;
 
 	mainloop ();
-
-	undef $dec;
-
-	undef $cap;
 }
 
 main_func();
+

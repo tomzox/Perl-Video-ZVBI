@@ -20,13 +20,13 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# Perl $Id$
+# Perl $Id: explist.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 # libzvbi #Id: explist.c,v 1.10 2006/02/10 06:25:38 mschimek Exp #
 
 use blib;
-use Video::Capture::ZVBI qw(/^VBI_/);
-use Getopt::Std;
 use strict;
+use Getopt::Std;
+use Video::ZVBI qw(/^VBI_/);
 
 my $check = 0;
 
@@ -411,9 +411,9 @@ sub list_modules {
         print "List of export modules:\n";
 
         my $i = 0;
-        while ( defined($xi = Video::Capture::ZVBI::export::info_enum($i)) ) {
+        while ( defined($xi = Video::ZVBI::export::info_enum($i)) ) {
                 die unless defined $xi->{keyword};
-                die unless defined Video::Capture::ZVBI::export::info_keyword($xi->{keyword});
+                die unless defined Video::ZVBI::export::info_keyword($xi->{keyword});
 
                 $xi->{label} = "(null)" unless defined $xi->{label};
                 $xi->{tooltip} = "(null)" unless defined $xi->{tooltip};
@@ -428,7 +428,7 @@ sub list_modules {
                 keyword_check($xi->{keyword});
 
                 my $errstr;
-                my $ex = Video::Capture::ZVBI::export::new($xi->{keyword}, $errstr);
+                my $ex = Video::ZVBI::export::new($xi->{keyword}, $errstr);
                 die "Could not open $xi->{keyword}: $errstr\n" unless defined $ex;
 
                 die $ex->errstr()."\n" unless defined $ex->info_export();

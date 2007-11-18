@@ -13,7 +13,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id$
+# $Id: typemap,v 1.1 2007/11/18 18:48:51 tom Exp tom $
 #
 
 TYPEMAP
@@ -39,14 +39,16 @@ VbiRawDecObj *		PO
 VbiExportObj *		PO
 VbiSearchObj *		PO
 VbiPageObj *		PO
-VbiDvbDemuxObj *	PO
-VbiIdlDemuxObj *	PO
-VbiPfcDemuxObj *	PO
-VbiXdsDemuxObj *	PO
+VbiDvb_DemuxObj *	PO
+VbiIdl_DemuxObj *	PO
+VbiPfc_DemuxObj *	PO
+VbiXds_DemuxObj *	PO
 
 # plain pointer
 VbiRawBuffer *		T_PTROBJ
 VbiSlicedBuffer *	T_PTROBJ
+
+zvbi_xs_srv_or_null	SV
 
 #############################################################################
 INPUT
@@ -59,12 +61,20 @@ PV
             Perl_croak(aTHX_ \"$var is not a scalar\")
 
 PO
-        if (sv_derived_from($arg, \"${(my $ntt=$ntype)=~s/Vbi(.*)Obj.*/Video::Capture::ZVBI::\L$1/;\$ntt}\")) {
+        if (sv_derived_from($arg, \"${(my $ntt=$ntype)=~s/Vbi(.*)Obj.*/Video::ZVBI::\L$1/;\$ntt}\")) {
             IV tmp = SvIV((SV*)SvRV($arg));
             $var = INT2PTR($type,tmp);
         }
         else
             Perl_croak(aTHX_ \"$var is not of type ${ntype}\")
+
+SV
+        if (SvOK($arg)) {
+                ${var}.l_services = SvIV($arg);
+                ${var}.p_services = &${var}.l_services;
+        } else {
+                ${var}.p_services = NULL;
+        }
 
 #############################################################################
 OUTPUT
@@ -73,5 +83,10 @@ PV
         $arg = $var;
 
 PO
-        sv_setref_pv($arg, \"${(my $ntt=$ntype)=~s/Vbi(.*)(Obj|Ref).*/Video::Capture::ZVBI::\L$1/;\$ntt}\", (void*)$var);
+        sv_setref_pv($arg, \"${(my $ntt=$ntype)=~s/Vbi(.*)(Obj|Ref).*/Video::ZVBI::\L$1/;\$ntt}\", (void*)$var);
+
+SV
+        if (${var}.p_services != NULL) {
+                SvIV_set($arg, ${var}.l_services);
+        }
 

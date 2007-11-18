@@ -17,10 +17,10 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id$
+# $Id: ZVBI.pm,v 1.1 2007/11/18 19:33:38 tom Exp tom $
 #
 
-package Video::Capture::ZVBI;
+package Video::ZVBI;
 
 use strict;
 use warnings;
@@ -29,11 +29,11 @@ require Exporter;
 require DynaLoader;
 
 our @ISA = ('Exporter', 'DynaLoader');
-our $VERSION = 0.2;
+our $VERSION = "0.2.0";
 our @EXPORT = qw();
-our @EXPORT_OK = qw();
+our @EXPORT_OK = qw();  # filled by XSUB
 
-bootstrap Video::Capture::ZVBI $VERSION;
+bootstrap Video::ZVBI $VERSION;
 
 1;
 
@@ -41,12 +41,14 @@ __END__
 
 =head1 NAME
 
-Video::Capture::ZVBI - VBI decoding (teletext, closed caption, ...)
+Video::ZVBI - VBI decoding (teletext, closed caption, ...)
 
 =head1 SYNOPSIS
 
-   use Video::Capture::ZVBI;
-   use Video::Capture::ZVBI qw(/^VBI_/);
+  use Video::ZVBI;
+
+  # OR: to import all constants
+  use Video::ZVBI qw(/^VBI_/);
 
 =head1 DESCRIPTION
 
@@ -77,7 +79,7 @@ data capture: B<Video::Capture::VBI> and based on that another one which
 covers Teletext caching: B<Video::TeletextDB>. Check for yourself which
 one fits your needs better.
 
-=head1 Video::Capture::ZVBI::capture
+=head1 Video::ZVBI::capture
 
 The following functions create and return capture contexts with the
 given parameters.  Upon success, the returned context can be passed
@@ -102,12 +104,12 @@ raw VBI data if the driver supports streaming. Otherwise one bounce
 buffer is allocated for I<$cap-E<gt>pull()>  I<$services> is a logical OR
 of C<VBI_SLICED_*> symbols describing the data services to be decoded.
 On return the services actually decodable will be stored here.
-See I<ZVBI::raw_dec::add_services> for details.  If you want to capture
+See I<ZVBI::raw_dec::add_services()> for details.  If you want to capture
 raw data only, set to C<VBI_SLICED_VBI_525>, C<VBI_SLICED_VBI_625> or
 both.  If this parameter is C<undef>, no services will be installed.
 You can do so later with I<$cap-E<gt>update_services()> (Note in this
 case the I<$reset> parameter to that function will have to be set to 1.)
-I<$strict> is passed internally to L<Video::CaptureZVBI::raw_dec::add_services()>.
+I<$strict> is passed internally to L<Video::ZVBI::raw_dec::add_services()>.
 I<$errorstr> is used to return an error description.  I<$trace> can be
 used to enable output of progress messages on I<stderr>.
 
@@ -156,9 +158,11 @@ used to enable output of progress messages on I<stderr>.
 =item $cap = $proxy->proxy_new($buffers, $scanning, $services, $strict, $errorstr)
 
 Open a new connection to a VBI proxy to open a VBI device for the
-given services.  On side of the proxy one of the regular I<v4l2_new()> etc.
-functions is invoked and if it succeeds, data slicing is started
-and all captured data is forwarded transparently.
+given services.  On side of the proxy daemon, one of the regular
+capture context creation functions (e.g. I<v4l2_new()>) is invoked. 
+If the creation succeeds, and any of the requested services are
+available, capturing is started and all captured data is forwarded
+transparently to the client.
 
 Whenever possible the proxy should be used instead of opening the device
 directly, since it allows the user to start multiple VBI clients in
@@ -171,20 +175,22 @@ Upon error the function returns C<undef> as result and an error message
 in I<$errorstr>
 
 Parameters: I<$proxy> is a reference to a previously created proxy
-client context (L<Video::Capture::ZVBI::proxy>.) The remaining
+client context (L<Video::ZVBI::proxy>.) The remaining
 parameters have the same meaning as described above, as they are used
 by the daemon when opening the device.
-I<$buffers> is the number of device buffers for raw VBI data.
-The same number of buffers is allocated to cache sliced data in the
-proxy daemon.  I<$scanning> indicates the current norm: 625 for PAL and
+I<$buffers> specifies the number of intermediate buffers on server side
+of the proxy socket connection. (Note this is not related to the
+device buffer count.)
+I<$scanning> indicates the current norm: 625 for PAL and
 525 for NTSC; set to 0 if you don't know (you should not attempt
 to query the device for the norm, as this parameter is only required
 for old v4l1 drivers which don't support video standard query ioctls.)
 I<$services> is a set of C<VBI_SLICED_*> symbols describing the data
 services to be decoded. On return I<$services> contains actually
-decodable services.  See L<Video::Capture::ZVBI::raw_dec::add_services()>
+decodable services.  See I<Video::ZVBI::raw_dec::add_services()>
 for details.  If you want to capture raw data only, set to
-C<VBI_SLICED_VBI_525>, C<VBI_SLICED_VBI_625> or both.  I<$strict> has
+C<VBI_SLICED_VBI_525>, C<VBI_SLICED_VBI_625> or both.  If this
+parameter is C<undef>, no services will be installed.  I<$strict> has
 the same meaning as described in the device-specific capture context
 creation functions.  I<$errorstr> is used to return an error message
 when the function fails.
@@ -233,10 +239,10 @@ On success, the function returns in I<$timestamp> the capture instant
 in seconds and fractions since 1970-01-01 00:00 in double format and
 in I<$n_lines> the number of sliced lines in the buffer. Note for
 efficiency the buffer is an array of vbi_sliced C structures. Use
-I<copy_sliced_line()> to process the contents in Perl, or pass the buffer
-directly to the I<VT> or other decoder objects.
+I<get_sliced_line()> to process the contents in Perl, or pass the buffer
+directly to class L<Video::ZVBI::vt> or other decoder objects.
 
-Note: it's generally more efficient to use I<vbi_capture_pull_sliced()>
+Note: it's generally more efficient to use I<pull_sliced()>
 instead, as that one may avoid having to copy sliced data into the
 given buffer (e.g. for the VBI proxy)
 
@@ -273,8 +279,8 @@ in raw format.
 Read a sliced VBI frame from the capture context, which is returned in
 I<$ref> in form of a blessed reference to an internal buffer. The data
 remains valid until the next call to this or any other "pull" function.
-The reference can be passed to I<copy_sliced_line()> to process the data in
-Perl, or it can be passed to a VT decoder object.
+The reference can be passed to I<get_sliced_line()> to process the data in
+Perl, or it can be passed to a L<Video::ZVBI::vt> decoder object.
 
 On success, the function returns in I<$timestamp> the capture instant
 in seconds and fractions since 1970-01-01 00:00 in double format and
@@ -300,7 +306,7 @@ read or pulled data by Perl code, use the following function:
 
 =over 4
 
-=item ($data, $id, $line) = $cap->copy_sliced_line($buffer, $line_idx)
+=item ($data, $id, $line) = $cap->get_sliced_line($buffer, $line_idx)
 
 The function takes a buffer which was filled by one of the slicer
 or capture & slice functions and a line index. The index must be lower
@@ -324,12 +330,65 @@ documentation.
 
 Returns a hash reference describing the physical parameters of the
 VBI source.  This hash can be used to initialize the raw decoder
-context described below.  You should not modify the parameters in the
-hash, use method I<$cap-E<gt>update_services()> instead.
+context described below.
 
-The hash array has the following members: scanning, sampling_format,
-sampling_rate, bytes_per_line, offset, start_a, start_b, count_a, count_b,
-interlaced, synchronous.
+The hash array has the following members:
+
+=over 8
+
+=item scanning
+
+Either 525 (M/NTSC, M/PAL) or 625 (PAL, SECAM), describing the scan
+line system all line numbers refer to.
+
+=item sampling_format
+
+Format of the raw VBI data.
+
+=item sampling_rate
+
+Sampling rate in Hz, the number of samples or pixels captured per second.
+
+=item bytes_per_line
+
+Number of samples or pixels captured per scan line, in bytes. This
+determines the raw VBI image width and you want it large enough to
+cover all data transmitted in the line (with headroom).
+
+=item offset
+
+The distance from 0H (leading edge hsync, half amplitude point) to
+the first sample (pixel) captured, in samples (pixels). You want an
+offset small enough not to miss the start of the data transmitted.
+
+=item start_a, start_b
+
+First scan line to be captured, first and second field respectively,
+according to the ITU-R line numbering scheme (see vbi_sliced). Set
+to zero if the exact line number isn't known.
+
+=item count_a, count_b
+
+Number of scan lines captured, first and second field respectively.
+This can be zero if only data from one field is required. The sum
+count_a + count_b determines the raw VBI image height.
+
+=item interlaced
+
+In the raw vbi image, normally all lines of the second field are
+supposed to follow all lines of the first field. When this flag is
+set, the scan lines of first and second field will be interleaved in
+memory. This implies count_a and count_b are equal.
+
+=item synchronous
+
+Fields must be stored in temporal order, i. e. as the lines have been
+captured. It is assumed that the first field is also stored first in
+memory, however if the hardware cannot reliable distinguish fields this
+flag shall be cleared, which disables decoding of data services
+depending on the field number.
+
+=back
 
 =item $services = $cap->update_services($reset, $commit, $services, $strict, $errorstr)
 
@@ -341,8 +400,8 @@ decoder context.  You may set I<$reset> to rebuild your service mask from
 scratch.  Note that the number of VBI lines may change with this call
 even if a negative result is returned.
 
-Result: Bitmask of supported services among those requested (not including
-previously added services), 0 upon errors.
+Result: The function returns a bitmask of supported services among those
+requested (not including previously added services), 0 upon errors.
 
 I<$reset> when set, clears all previous services before adding new
 ones (by invoking I<$raw_dec-E<gt>reset()> at the appropriate time.)
@@ -353,7 +412,7 @@ commited (because capturing has to be suspended to allow resizing the
 VBI image.)  Note this flag is ignored when using the VBI proxy.
 I<$services> contains a set of C<VBI_SLICED_*> symbols describing the
 data services to be decoded. On return the services actually decodable
-will be stored here, i.e. the behaviour is identical to v4l2_new() etc.
+will be stored here, i.e. the behaviour is identical to I<v4l2_new()> etc.
 I<$strict> and I<$errorstr> are also same as during capture context
 creation.
 
@@ -364,11 +423,11 @@ capture context's device.  Note when using the proxy this will not
 be the actual device, but a socket instead.  Some devices may also
 return -1 if they don't have anything similar, or upon internal errors.
 
-The descriptor is intended be used for I<select()> by caller. The
+The descriptor is intended be used in a I<select(2)> syscall. The
 application especially must not read or write from it and must never
-close the handle (call the context close function instead.)
-In other words, the filehandle is intended to allow capturing
-asynchronously in the background: The handle will become readable
+close the handle (instead destroy the capture context to free the
+device.) In other words, the filehandle is intended to allow capturing
+asynchronously in the background; The handle will become readable
 when new data is available.
 
 =item $cap->get_scanning()
@@ -388,7 +447,7 @@ previous TV channel.
 =item $cap->set_video_path($dev)
 
 The function sets the path to the video device for TV norm queries.
-Parameter $<dev> must refer to the same hardware as the VBI device
+Parameter I<$dev> must refer to the same hardware as the VBI device
 which is used for capturing (e.g. C</dev/video0> when capturing from
 C</dev/vbi0>) Note: only useful for old video4linux drivers which don't
 support norm queries through VBI devices.
@@ -396,15 +455,35 @@ support norm queries through VBI devices.
 =item $cap->get_fd_flags()
 
 Returns properties of the capture context's device. The result is an OR
-of one or more C<VBI_FD_*> constants.
+of one or more C<VBI_FD_*> constants:
 
-=item $cap->vbi_capture_dvb_filter($pid)
+=over 8
+
+=item VBI_FD_HAS_SELECT
+
+Is set when I<select(2)> can be used on the filehandle returned by
+I<$cap-E<gt>fd()> to wait for new data on the capture device file handle.
+
+=item VBI_FD_HAS_MMAP
+
+Is set when the capture device supports "user-space DMA".  In this case
+it's more efficient to use one of the "pull" functions to read raw data
+because otherwise the data has to be copied once more into the passed buffer.
+
+=item VBI_FD_IS_DEVICE
+
+Is not set when the capture device file handle is not the actual device.
+In this case it can only be used for select(2) and not for ioctl(2)
+
+=back
+
+=item $cap->dvb_filter($pid)
 
 Programs the DVB device transport stream demultiplexer to filter
 out PES packets with the given I<$pid>.  Returns -1 on failure,
 0 on success.
 
-=item $cap->vbi_capture_dvb_last_pts()
+=item $cap->dvb_last_pts()
 
 Returns the presentation time stamp (33 bits) associated with the data
 last read from the context. The PTS refers to the first sliced
@@ -416,7 +495,7 @@ packet containing the first sliced line arrived.
 
 =back
 
-=head1 Video::Capture::ZVBI::proxy
+=head1 Video::ZVBI::proxy
 
 The following functions are used for receiving sliced or raw data from
 VBI proxy daemon.  Using the daemon instead of capturing directly from
@@ -444,37 +523,75 @@ used to enable output of progress messages on I<stderr>.
 
 =item $proxy->get_capture_if()
 
-This function is not supported as it does not make sense.  In libzvbi the
-function returns a reference to a capture context created from the proxy
-context via I<$proxy-E<gt>proxy_new()>.  In Perl, you must keep the
-reference anyway, because otherwise the capture context would be
-automatically closed and destroyed.  So you can just use the stored
-reference instead of using this function.
+This function is not supported as it does not make sense for the
+Perl module.  In libzvbi the function returns a reference to a capture
+context created from the proxy context via I<$proxy-E<gt>proxy_new()>.
+In Perl, you must keep the reference anyway, because otherwise the
+capture context would be automatically closed and destroyed.  So you
+can just use the stored reference instead of using this function.
 
 =item $proxy->set_callback(\&callback [, $user_data])
 
 Installs or removes a callback function for asynchronous messages (e.g.
 channel change notifications.)  The callback function is typically invoked
-while processing a read from the capture device. The callback function
-will receive the event mask (i.e. one of symbols C<VBI_PROXY_EV_*>) and,
-if provided, the I<$user_data> parameter.
+while processing a read from the capture device.
 
 Input parameters are a function reference I<$callback> and an optional
 scalar I<$user_data> which is passed through to the callback unchanged.
 Call without arguments to remove the callback again.
 
+The callback function will receive the event mask (i.e. one of the
+constants C<VBI_PROXY_EV_*> in the following list) and, if provided,
+I<$user_data> as parameters.
+
+=over 8
+
+=item VBI_PROXY_EV_CHN_GRANTED
+
+The channel control token was granted, so that the client may now change the
+channel.  Note: the client should return the token after the channel change
+was completed (the channel will still remain reserved for the requested
+time.)
+
+=item VBI_PROXY_EV_CHN_CHANGED
+
+The channel (e.g. TV tuner frequency) was changed by another proxy client.
+
+=item VBI_PROXY_EV_NORM_CHANGED
+
+The TV norm was changed by another client (in a way which affects VBI,
+e.g. changes between PAL/SECAM are ignored.)  The client must update
+its services, else no data will be forwarded by the proxy until
+the norm is changed back.
+
+=item VBI_PROXY_EV_CHN_RECLAIMED
+
+The proxy daemon requests to return the channel control token.  The client
+is no longer allowed to switch the channel and must immediately reply with
+a channel notification with flag C<VBI_PROXY_CHN_TOKEN>
+
+=item VBI_PROXY_EV_NONE
+
+No news.
+
+=back
+
 =item $proxy->get_driver_api()
 
 This function can be used to query which driver is behind the
 device which is currently opened by the VBI proxy daemon.
-Applications which use libzvbi's capture API only need not
-care about this.  The information is only relevant to applications
-which need to change channels or norms.
+Applications which only use libzvbi's capture API need not
+care about this.  The information is relevant to applications
+which need to switch TV channels or norms.
 
 Returns an identifier describing which API is used on server side,
-i.e. one of the symbols C<VBI_API_*>, or -1 upon error.  The function
-will fail if the client is currently not connected to the daemon,
-i.e. VPI capture has to be started first.
+i.e. one of the symbols
+C<VBI_API_V4L1>,
+C<VBI_API_V4L2>,
+C<VBI_API_BKTR> or
+C<VBI_API_UNKNOWN> upon error.
+The function will fail if the client is currently not connected to
+the proxy daemon, i.e. VBI capture has to be started first.
 
 =item $proxy->channel_request($chn_prio [,$profile])
 
@@ -507,16 +624,16 @@ to a hash with the following members: "sub_prio", "allow_suspend",
 =item $proxy->channel_notify($notify_flags [, $scanning])
 
 Sends channel control request to proxy daemon. Parameter
-I<$> is an OR of one or more of the folowing constants:
+I<$notify_flags> is an OR of one or more of the following constants:
 
 =over 8
 
-=item B<VBI_PROXY_CHN_RELEASE>
+=item VBI_PROXY_CHN_RELEASE
 
 Revoke a previous channel request and return the channel switch
 token to the daemon.
 
-=item B<VBI_PROXY_CHN_TOKEN>
+=item VBI_PROXY_CHN_TOKEN
 
 Return the channel token to the daemon without releasing the
 channel; This should always be done when the channel switch has
@@ -524,7 +641,7 @@ been completed to allow faster scheduling in the daemon (i.e. the
 daemon can grant the token to a different client without having
 to reclaim it first.)
 
-=item B<VBI_PROXY_CHN_FLUSH>
+=item VBI_PROXY_CHN_FLUSH
 
 Indicate that the channel was changed and VBI buffer queue
 must be flushed; Should be called as fast as possible after
@@ -532,13 +649,13 @@ the channel and/or norm was changed.  Note this affects other
 clients' capturing too, so use with care.  Other clients will
 be informed about this change by a channel change indication.
 
-=item B<VBI_PROXY_CHN_NORM>
+=item VBI_PROXY_CHN_NORM
 
 Indicate a norm change.  The new norm should be supplied in
 the scanning parameter in case the daemon is not able to
 determine it from the device directly.
 
-=item B<VBI_PROXY_CHN_FAIL>
+=item VBI_PROXY_CHN_FAIL
 
 Indicate that the client failed to switch the channel because
 the device was busy. Used to notify the channel scheduler that
@@ -566,7 +683,15 @@ be used directly.
 
 Parameters and results are equivalent to the called B<ioctl> operation,
 i.e. I<$request> is an IO code and I<$arg> is a packed binary structure.
-The result is -1 on error and errno set appropriately, else 0.  The function
+After the call I<$arg> may be modified for operations which return data.
+You must make sure the result buffer is large enough for the returned data.
+Use Perl's I<pack> to build the argument buffer. Example:
+
+  # get current config of the selected chanel
+  $vchan = pack("ix32iLss", $channel, 0, 0, 0, $norm);
+  $proxy->device_ioctl(VIDIOCGCHAN, $vchan);
+
+The result is 0 upon success, else and C<$!> set appropriately.  The function
 also will fail with error code C<EBUSY> if the client doesn't have permission
 to control the channel.
 
@@ -584,7 +709,7 @@ Returns 1 if client is currently allowed to switch channels, else 0.
 
 See B<examples/proxy-test.pl> for examples how to use these functions.
 
-=head1 Video::Capture::ZVBI::rawdec
+=head1 Video::ZVBI::rawdec
 
 The functions in this section allow converting raw VBI samples to
 bits and bytes (i.e. analog to digital conversion - even though the
@@ -596,17 +721,17 @@ functions of the capture object (e.g. I<pull_sliced>)
 
 =over 4
 
-=item $rd = Video::Capture::ZVBI::rawdec::new($ref)
+=item $rd = Video::ZVBI::rawdec::new($ref)
 
 Creates and initializes a new raw decoder context. Parameter I<$ref>
 specifies the physical parameters of the raw VBI image, such as the
 sampling rate, number of VBI lines etc.  The parameter can be either
-a reference to a capture context (L<Video::Capture::ZVBI::capture>)
+a reference to a capture context (L<Video::ZVBI::capture>)
 or a reference to a hash. The contents for the hash are as returned
 by method I<$cap-E<gt>parameters()> on capture contexts, i.e. they
 describe the physical parameters of the source.
 
-=item $services = Video::Capture::ZVBI::rawdec::parameters($href, $services, $scanning, $max_rate)
+=item $services = Video::ZVBI::rawdec::parameters($href, $services, $scanning, $max_rate)
 
 Calculate the sampling parameters required to receive and decode the
 requested data services.  This function can be used to initialize
@@ -616,7 +741,7 @@ accordingly to a reasonable minimum.
 
 Input parameters: I<$href> must be a reference to a hash which is filled
 with sampling parameters on return (contents see
-L<Video::Capture::ZVBI::capture::parameters>.)
+I<Video::ZVBI::capture::parameters()>.)
 I<$services> is a set of C<VBI_SLICED_*> constants. Here (and only here)
 you can add C<VBI_SLICED_VBI_625> or C<VBI_SLICED_VBI_525> to include all
 VBI scan lines in the calculated sampling parameters.
@@ -702,28 +827,23 @@ raw decoder contexts for different devices.
 
 =back
 
-=head1 Video::Capture::ZVBI::dvbdemux
+=head1 Video::ZVBI::dvb_demux
 
 Separating VBI data from a DVB PES stream (EN 301 472, EN 301 775).
 
 =over 4
 
-=item $dvb = Video::Capture::ZVBI::dvbdemux::new( [$callback [, $user_data]] )
+=item $dvb = Video::ZVBI::dvb_demux::pes_new( [$callback [, $user_data]] )
 
 Creates a new DVB VBI demultiplexer context taking a PES stream as input.
 Returns a reference to the newly allocated DVB demux context.
 
-When optional parameter I<$callback> is present, the function it refers
-to will be called inside of I<$dvb-E<gt>cor()> and I<$dvb-E<gt>feed()>
-when a new frame is available. When optional parameter I<$user_data> is
-present, it's appended to the callback parameters. 
-
-The handler function is called with the following parameters:
-I<sliced> is a reference to a buffer holding sliced data; the reference
-has the same type as returned by capture functions. I<$n_lines> specifies
-the number of valid lines in the buffer. I<$pts> is the timestamp.
-The last parameter is I<$user_data>, if given during creation.
-The handler should return 1 on success, 0 on failure.
+The optional callback parameters should only be present if decoding will
+occur via the I<$dvbE<gt>feed()> method.  The function referenced by
+I<$callback> will be called inside of I<$dvb-E<gt>feed()> whenever
+new sliced data is available. Optional parameter I<$user_data> is
+appended to the callback parameters. See I<$dvbE<gt>feed()> for
+additional details.
 
 =item $dvb->reset()
 
@@ -777,6 +897,16 @@ buffer for sliced data.  Since this function does not return sliced
 data, it's only useful if you have installed a handler. Do not mix
 calls to this function with I<$dvb-E<gt>cor()>.
 
+The callback function is called with the following parameters:
+
+  $ok = &$callback($sliced_buf, $n_lines, $pts, $user_data);
+
+I<$sliced> is a reference to a buffer holding sliced data; the reference
+has the same type as returned by capture functions. I<$n_lines> specifies
+the number of valid lines in the buffer. I<$pts> is the timestamp.
+The last parameter is I<$user_data>, if given during creation.
+The handler should return 1 on success, 0 on failure.
+
 Note: Demultiplexing of raw VBI data is not supported yet,
 raw data will be discarded.
 
@@ -785,7 +915,7 @@ raw data will be discarded.
 The DVB demultiplexer supports the logging of errors in the PES stream and
 information useful to debug the demultiplexer.
 With this function you can redirect log messages generated by this module
-from general log function I<Video::Capture::ZVBI::set_log_fn()> to a
+from general log function I<Video::ZVBI::set_log_fn()> to a
 different function or enable logging only in the DVB demultiplexer.
 The callback can be removed by omitting the handler name.
 
@@ -800,7 +930,7 @@ Note: Kind and contents of log messages may change in the future.
 
 =back
 
-=head1 Video::Capture::ZVBI::idldemux
+=head1 Video::ZVBI::idl_demux
 
 The functions in since section decode data transmissions in
 Teletext B<Independent Data Line> packets (EN 300 708 section 6),
@@ -808,9 +938,9 @@ i.e. data transmissions based on packet 8/30.
 
 =over 4
 
-=item Video::Capture::ZVBI::idldemux::new($channel, $address [, $callback, $user_data] )
+=item $idl = Video::ZVBI::idl_demux::new($channel, $address [, $callback, $user_data] )
 
-Creates and initializes a new Independent Data Line format A
+Creates and returns a new Independent Data Line format A
 (EN 300 708 section 6.5) demultiplexer.
 
 I<$channel> filter out packets of this channel. 
@@ -836,9 +966,18 @@ the packet contained incorrectable errors.
 
 Parameters to the handler are: I<$buffer>, I<$flags>, I<$user_data>.
 
+=item $ok = $idl->feed_frame($sliced_buf, $n_lines)
+
+This function works like I<$idl-E<gt>feed()> but takes a sliced
+buffer (i.e. a full frame's worth of sliced data) and automatically
+filters out all teletext lines.  This can be used to "short-circuit"
+the capture output with the de-multiplexer.
+
+B<Available:> since libzvbi version 0.2.26
+
 =back
 
-=head1 Video::Capture::ZVBI::pfcdemux
+=head1 Video::ZVBI::pfc_demux
 
 Separating data transmitted in Page Function Clear Teletext packets
 (ETS 300 708 section 4), i.e. using regular packets on a dedicated
@@ -846,9 +985,9 @@ teletext page.
 
 =over 4
 
-=item Video::Capture::ZVBI::pfcdemux::new($pgno, $stream [, $callback, $user_data] )
+=item $pfc = Video::ZVBI::pfc_demux::new($pgno, $stream [, $callback, $user_data] )
 
-Creates and initializes a new demultiplexer context.
+Creates and returns a new demultiplexer context.
 
 Parameters: I<$page> specifies the teletext page on which the data is
 transmitted.  I<$stream> is the stream number to be demultiplexed.
@@ -875,17 +1014,26 @@ I<$application_id> is the application ID of the block;
 I<$block> is a scalar holding the block's data;
 optional I<$user_data> is passed through from the creation.
 
+=item $ok = $pfc->feed_frame($sliced_buf, $n_lines)
+
+This function works like I<$pfc-E<gt>feed()> but takes a sliced
+buffer (i.e. a full frame's worth of sliced data) and automatically
+filters out all teletext lines.  This can be used to "short-circuit"
+the capture output with the de-multiplexer.
+
+B<Available:> since libzvbi version 0.2.26
+
 =back
 
-=head1 Video::Capture::ZVBI::xdsdemux
+=head1 Video::ZVBI::xds_demux
 
 Separating XDS data from a Closed Caption stream (EIA 608). 
 
 =over 4
 
-=item new( [$callback, $user_data] )
+=item $xds = Video::ZVBI::xds_demux::new( [$callback, $user_data] )
 
-Creates and initializes a new Extended Data Service (EIA 608) demultiplexer.
+Creates and returns a new Extended Data Service (EIA 608) demultiplexer.
 
 The optional parameters I<$callback> and I<$user_data> specify
 a handler and passed-through parameter which is called when
@@ -908,22 +1056,33 @@ in the buffer hold valid data.
 Returns 0 if the buffer contained parity errors.
 
 The handler is called with the following parameters:
-I<$xds_class> is the XDS packet class, i.e. one of the C<VBI_XDS_CLASS_*> constants.
+I<$xds_class> is the XDS packet class, i.e. one of the C<VBI_XDS_CLASS_*>
+constants.
 I<$xds_subclass> holds the subclass; meaning depends on the main class.
 I<$buffer> is a scalar holding the packet data (already parity decoded.)
 optional I<$user_data> is passed through from the creation.
 
+=item $ok = $xds->feed_frame($sliced_buf, $n_lines)
+
+This function works like I<$xds-E<gt>feed()> but takes a sliced
+buffer (i.e. a full frame's worth of sliced data) and automatically
+filters out all teletext lines.  This can be used to "short-circuit"
+the capture output with the de-multiplexer.
+
+B<Available:> since libzvbi version 0.2.26
+
 =back
 
-=head1 Video::Capture::ZVBI::vt
+=head1 Video::ZVBI::vt
 
 This section describes high level decoding functions.  Input to the
 decoder functions in this section is sliced data, as returned from
-capture objects or the raw decoder.
+capture objects (L<Video::ZVBI::capture>) or the raw decoder
+(L<Video::ZVBI::rawdec>)
 
 =over 4
 
-=item $vt = Video::Capture::ZVBI::vt::decoder_new()
+=item $vt = Video::ZVBI::vt::decoder_new()
 
 Creates and returnes a new data service decoder instance.
 
@@ -1031,7 +1190,7 @@ significant bits will be replaced.
 
 Fetches a Teletext page designated by parameters I<$pgno> and I<$subno>
 from the cache, formats and returns it as a blessed reference to a
-page object of type L<Video::Capture::ZVBI::page>.  The reference can
+page object of type L<Video::ZVBI::page>.  The reference can
 then be passed to the various libzvbi methods working on page objects,
 such as the export functions.
 
@@ -1041,10 +1200,12 @@ for display. Level 2.5/3.5 pages which could not be formatted e. g.
 due to referencing data pages not in cache are formatted at a
 lower level.
 
-Further input parameters: I<$max_level> is one of the C<VBI_WST_LEVEL_*>
-constants and specifies the Teletext implementation level to use for
-formatting.  I<$display_rows> limits rendering to the given
-number of rows (i.e. row 0 ... I<$display_rows> - 1)  In practice, useful
+Further input parameters: If I<$subno> is C<VBI_ANY_SUBNO> then the
+newest sub-page of the given page is returned.
+I<$max_level> is one of the C<VBI_WST_LEVEL_*> constants and specifies
+the Teletext implementation level to use for formatting.
+I<$display_rows> limits rendering to the given number of rows
+(i.e. row 0 ... I<$display_rows> - 1)  In practice, useful
 values are 1 (format the page header row only) or 25 (complete page).
 Boolean parameter I<$navigation> can be used to skip parsing the page
 for navigation links to save formatting time.  The last three parameters
@@ -1063,7 +1224,7 @@ be forced by use of Perl's I<undef> operator.
 
 Fetches a Closed Caption page designated by I<$pgno> from the cache,
 formats and returns it and  as a blessed reference to a page object
-of type L<Video::Capture::ZVBI::page>.
+of type L<Video::ZVBI::page>.
 Returns C<undef> upon errors.
 
 Closed Caption pages are transmitted basically in two modes: at once
@@ -1094,19 +1255,19 @@ At the moment pages can only be added to the cache but not removed
 unless the decoder is reset. That will change, making the result
 volatile in a multithreaded environment.
 
-=item $vt->cache_hi_subno($pgno)
+=item $subno = $vt->cache_hi_subno($pgno)
 
 This function queries the highest cached subpage of the page
 page specified by parameter I<$pgno>.
 
 This function is deprecated for the same reason as I<$vt-E<gt>is_cached()>
 
-=item $vt->page_title($pgno, $subno)
+=item $title = $vt->page_title($pgno, $subno)
 
 The function makes an effort to deduce a page title to be used in
 bookmarks or similar purposes for the page specified by parameters
 I<$pgno> and I<$subno>.  The title is mainly derived from navigation data
-on the given page.
+on the given page.  The function returns the title or C<undef> upon error.
 
 =back
 
@@ -1127,7 +1288,7 @@ describing the event.  See libzvbi for a definition of contents.
 
 =over 4
 
-=item $vt->event_handler_register($event_mask, $handler, $user_data=NULL)
+=item $vt->event_handler_register($event_mask, $handler [, $user_data])
 
 Registers a new event handler. I<$event_mask> can be any 'or' of C<VBI_EVENT_*>
 constants, -1 for all events and 0 for none. When the I<$handler> function with
@@ -1141,8 +1302,11 @@ respective data. A C<VBI_EVENT_TTX_PAGE> handler for example enables
 Teletext decoding.
 
 This function can be safely called at any time, even from inside of a handler.
+Note only 10 event callback functions can be registered in a script at the
+same time.  Callbacks are automatically unregistered when the decoder object
+is destroyed.
 
-=item $vt->event_handler_unregister($handler, $user_data)
+=item $vt->event_handler_unregister($handler [, $user_data])
 
 Unregisters the event handler I<$handler> with parameter I<$user_data>,
 if such a handler was previously registered.
@@ -1156,31 +1320,190 @@ This function can be safely called at any time, even from inside of a
 handler removing itself or another handler, and regardless if the handler
 has been successfully registered.
 
+=item $vt->event_handler_add($event_mask, $handler [, $user_data])
+
+B<Depreceated:> Installs I<$handler> as event callback for the given
+events.  When using this function you can install only a single event
+handler per decoder (note this is a stronger limitation than the one
+in libzvbi for this function.) For this reason the function is
+depreceated; use I<event_handler_register()> in new code.
+The function returns boolean FALSE on failure, else TRUE.
+
+Parameters: I<$event_mask> is one of the C<VBI_EVENT*> constants and
+specifies the events the handler is waiting for.
+I<$handler> is a reference to a handler function.
+The optional I<$user_data> is stored internally and passed through
+in calls to the event handler function.
+
+=item $vt->event_handler_remove($handler)
+
+B<Depreceated:>
+This function removes an event handler function (if any) which was
+previously installed via I<$vtE<gt>event_handler_add()>.
+The I<$handler> parameter is optional, as it is not used.
+Use I<event_handler_register()> and I<event_handler_unregister()>
+in new code instead.
+
 =back
 
-=head1 Video::Capture::ZVBI::page
+The following event types are defined:
+
+=over 8
+
+=item VBI_EVENT_NONE
+
+No event.
+
+=item VBI_EVENT_CLOSE
+
+The vbi decoding context is about to be closed. This event is
+sent when the decoder object is destroyed and can be used to
+clean up event handlers.
+
+=item VBI_EVENT_TTX_PAGE
+
+The vbi decoder received and cached another Teletext page
+designated by I<$ev-E<gt>{pgno}> and I<$ev-E<gt>{subno}>.
+
+I<$ev-E<gt>{roll_header}> flags the page header as suitable for
+rolling page numbers, e. g. excluding pages transmitted out
+of order.
+
+The I<$ev-E<gt>{header_update}> flag is set when the header,
+excluding the page number and real time clock, changed since the
+last C<VBI_EVENT_TTX_PAGE>. Note this may happen at midnight when the
+date string changes. The I<$ev-E<gt>{clock_update}> flag is set when
+the real time clock changed since the last C<VBI_EVENT_TTX_PAGE>
+(that is at most once per second). They are both set at the first
+C<VBI_EVENT_TTX_PAGE> sent and unset while the received header
+or clock field is corrupted.
+
+If any of the roll_header, header_update or clock_update flags
+are set I<$ev-E<gt>{raw_header}> is a pointer to the raw header data
+(40 bytes), which remains valid until the event handler returns.
+I<$ev-E<gt>{pn_offset}> will be the offset (0 ... 37) of the three
+digit page number in the raw or formatted header. Allways call
+I<$vt-<Egt>fetch_vt_page()> for proper translation of national characters
+and character attributes, the raw header is only provided here
+as a means to quickly detect changes.
+
+=item VBI_EVENT_CAPTION
+
+A Closed Caption page has changed and needs visual update.
+The page or "CC channel" is designated by I<$ev-E<gt>{pgno}>.
+
+When the client is monitoring this page, the expected action is
+to call I<$vt-E<gt>fetch_cc_page()>. To speed up rendering, more detailed
+update information can be queried via I<$pg-E<gt>get_page_dirty_range()>.
+(Note the vbi_page will be a snapshot of the status at fetch time
+and not event time, i.e. the "dirty" flags accumulate all changes
+since the last fetch.)
+
+=item VBI_EVENT_NETWORK
+
+Some station/network identifier has been received or is no longer
+transmitted (in the latter case all values are zero, eg. after a
+channel switch).  The event will not repeat until a different identifier
+has been received and confirmed.  (Note: VPS/TTX and XDS will not combine
+in real life, feeding the decoder with artificial data can confuse
+the logic.)
+
+The referenced hash contains the following elements:
+nuid,
+name,
+call,
+tape_delay,
+cni_vps,
+cni_8301,
+cni_8302,
+cycle.
+
+Minimum time to identify network, when data service is transmitted:
+VPS (DE/AT/CH only): 0.08 seconds; Teletext PDC or 8/30: 2 seconds;
+XDS (US only): unknown, between 0.1x to 10x seconds.
+
+=item VBI_EVENT_TRIGGER
+
+Triggers are sent by broadcasters to start some action on the
+user interface of modern TVs. Until libzvbi implements all of
+WebTV and SuperTeletext the information available are program
+related (or unrelated) URLs, short messages and Teletext
+page links.
+
+This event is sent when a trigger has fired.
+The hash parameter contains the following elements:
+type,
+eacem,
+name,
+url,
+script,
+nuid,
+pgno,
+subno,
+expires,
+itv_type,
+priority,
+autoload.
+
+=item VBI_EVENT_ASPECT
+
+The vbi decoder received new information (potentially from
+PAL WSS, NTSC XDS or EIA-J CPR-1204) about the program
+aspect ratio.
+
+The hash parameter contains the following elements:
+first_line,
+last_line,
+ratio,
+film_mode,
+open_subtitles.
+
+=item VBI_EVENT_PROG_INFO
+
+We have new information about the current or next program.
+(Note this event is preliminary as info from Teletext is not implemented yet.)
+
+The referenced has contains the programme description including
+a lot of parameters. See libzvbi documentation for details.
+
+=item VBI_EVENT_NETWORK_ID
+
+Like C<VBI_EVENT_NETWORK>, but this event will also be sent
+when the decoder cannot determine a network name.
+
+B<Available:> since libzvbi version 0.2.20
+
+=back
+
+=head1 Video::ZVBI::page
 
 These are functions to render Teletext and Closed Caption pages directly
 into memory, essentially a more direct interface to the functions of some
-important export modules described in L<Video::Capture::ZVBI::export>.
+important export modules described in L<Video::ZVBI::export>.
 
 All of the functions in this section work on page objects as returned
-by the page cache's "fetch" functions (see L<Video::Capture::ZVBI::vt>)
-or the page search function (see L<Video::Capture::ZVBI::search>)
+by the page cache's "fetch" functions (see L<Video::ZVBI::vt>)
+or the page search function (see L<Video::ZVBI::search>)
 
 =over 4
 
 =item $canvas = $pg->draw_vt_page($fmt=VBI_PIXFMT_RGBA32_LE, $reveal=0, $flash_on=0)
 
 Draw a complete Teletext page. Each teletext character occupies
-12 x 10 pixels (i.e. a character is 12 pixels wide and each lins
-is 10 pixels high.)
+12 x 10 pixels (i.e. a character is 12 pixels wide and each line
+is 10 pixels high. Note that this aspect ratio is not optimal
+for display, so pixel lines should be doubled. This is done
+automatically by the XPM conversion functions.)
 
-The image is returned in a scalar which contains a byte string.  Each
-pixel uses 4 subsequent bytes in the string (RGBA). Hence the string
-is C<4 * 12 * $pg_columns * 10 * $pg_rows> bytes long, where
+The image is returned in a scalar which contains a byte string.  When
+using format C<VBI_PIXFMT_RGBA32_LE>, each pixel consists of 4 subsequent
+bytes in the string (RGBA). Hence the string is
+C<4 * 12 * $pg_columns * 10 * $pg_rows> bytes long, where
 C<$pg_columns> and C<$pg_rows> are the page width and height in
-teletext characters respectively.
+teletext characters respectively.  When using format C<VBI_PIXFMT_PAL8>
+(only available with libzvbi version 0.2.26 or later) each pixel uses
+one byte. In this case each pixel value is an index into the color
+palette as delivered by I<$pg-E<gt>get_page_color_map()>.
 
 Note this function is just a convienence interface to
 I<$pg-E<gt>draw_vt_page_region()> which automatically inserts the
@@ -1193,7 +1516,7 @@ See the following function for descriptions of the remaining parameters.
 =item $pg->draw_vt_page_region($fmt, $canvas, $img_pix_width, $col_pix_off, $row_pix_off, $column, $row, $width, $height, $reveal=0, $flash_on=0)
 
 Draw a sub-section of a Teletext page. Each character occupies 12 x 10 pixels
-(i.e. a character is 12 pixels wide and each lins is 10 pixels high.)
+(i.e. a character is 12 pixels wide and each line is 10 pixels high.)
 
 The image is written into I<$canvas>. If the scalar is undefined or not
 large enough to hold the output image, the canvas is initialized as black.
@@ -1228,7 +1551,7 @@ Note all four values are given as numbers of teletext characters (not pixels.)
 
 Example to draw two pages stacked into one canvas:
 
-  my $fmt = Video::Capture::ZVBI::VBI_PIXFMT_RGBA32_LE;
+  my $fmt = Video::ZVBI::VBI_PIXFMT_RGBA32_LE;
   my $canvas = $pg->draw_blank($fmt, 10 * 25 * 2);
   $pg_1->draw_vt_page_region($fmt, $canvas,
                              -1, 0, 0, 0, 0, 40, 25);
@@ -1244,7 +1567,7 @@ to draw the page repeatedly with this parameter alternating between 0 and 1.
 =item $canvas = $pg->draw_cc_page($fmt=VBI_PIXFMT_RGBA32_LE)
 
 Draw a complete Closed Caption page. Each character occupies
-16 x 26 pixels (i.e. a character is 16 pixels wide and each lins
+16 x 26 pixels (i.e. a character is 16 pixels wide and each line
 is 26 pixels high.)
 
 The image is returned in a scalar which contains a byte string.  Each
@@ -1297,6 +1620,9 @@ value as used when drawing the image. If this parameter is omitted
 or set to -1, the referenced page's full width is assumed (which is
 suitable for converting images generated by I<draw_vt_page()> or
 I<draw_cc_page()>.)
+
+Note: Since libzvbi 0.2.26, you can also obtain XPM snapshots
+via the L<Video::ZVBI::export> class.
 
 =item $txt = $pg->print_page($table=0, $rtl=0)
 
@@ -1372,7 +1698,17 @@ Practically this is only used in Closed Caption roll-up
 mode, otherwise all rows are always marked dirty. Clients
 are free to ignore this information.
 
-=item $pg->get_page_text_properties()
+=item $av = $pg->get_page_color_map()
+
+The function returns a reference to an array with 40 entries which
+contains the page color palette. Each array entry is a 24-bit RGB value
+(i.e. three 8-bit values for red, green, blue, with red in the
+lowest bits)  To convert this into the usual #RRGGBB syntax use:
+
+  sprintf "#%02X%02X%02X",
+          $rgb&0xFF, ($rgb>>8)&0xFF, ($rgb>>16)&0xFF
+
+=item $av = $pg->get_page_text_properties()
 
 The function returns a reference to an array which contains
 the properties of all characters on the given page. Each element
@@ -1381,7 +1717,7 @@ width in bits given behind the colon):
 foreground:8, background:8, opacity:4, size:4,
 underline:1, bold:1, italic:1, flash:1, conceal:1, proportional:1, link:1.
 
-=item $txt = $pg->get_page_text(all_chars=0)
+=item $txt = $pg->get_page_text( [$all_chars] )
 
 The function returns the complete page text in form of an UTF-8
 string.  This function is very similar to I<$pg-E<gt>print_page()>,
@@ -1400,9 +1736,9 @@ Otherwise these are replaced with blanks. Note use of these
 characters will cause warnings when passing the string to
 transcoder functions (such as Perl's I<encode()> or I<print>.)
 
-=item $txt = $pg->vbi_resolve_link($column, $row)
+=item $href = $pg->vbi_resolve_link($column, $row)
 
-The references page (in practice only Teletext pages) may contain
+The referenced page I<$pg> (in practice only Teletext pages) may contain
 hyperlinks such as HTTP URLs, e-mail addresses or links to other
 pages. Characters being part of a hyperlink have their "link" flag
 set in the character properties (see I<$pg-E<gt>get_page_text_properties()>),
@@ -1414,7 +1750,7 @@ type of the link not all elements may be present):
 type, eacem, name, url, script, nuid, pgno, subno,
 expires, itv_type, priority, autoload.
 
-=item $pg->vbi_resolve_home()
+=item $href = $pg->vbi_resolve_home()
 
 All Teletext pages have a built-in home link, by default
 page 100, but can also be the magazine intro page or another
@@ -1424,7 +1760,7 @@ reference with the same elements as I<$pg-E<gt>vbi_resolve_link()>.
 =item $pg->unref_page()
 
 This function can be use to de-reference the given page (see also
-I<$vt->fetch_vt_page()> and I<$vt->fetch_cc_page().)
+I<$vt-E<gt>fetch_vt_page()> and I<$vt-E<gt>fetch_cc_page()>)
 The call is equivalent to using Perl's I<undef> operator
 on the page reference (i.e. C<undef $pg;>)
 
@@ -1435,7 +1771,7 @@ function or block which works on the reference is left.
 
 =back
 
-=head1 Video::Capture::ZVBI::export
+=head1 Video::ZVBI::export
 
 Once libzvbi received, decoded and formatted a Teletext or Closed Caption
 page you will want to render it on screen, print it as text or store it
@@ -1444,14 +1780,18 @@ object into the desired format or rendering directly into an image.
 
 =over 4
 
-=item $exp = Video::Capture::ZVBI::export::new($keyword, $errstr)
+=item $exp = Video::ZVBI::export::new($keyword, $errstr)
 
 Creates a new export module object to export a VBI page object in
 the respective module format. As a special service you can
 initialize options by appending to the I<$keyword> parameter like this:
 C<$keyword = "keyword; quality=75.5, comment=\"example text\"";>
 
-=item $href = Video::Capture::ZVBI::export::info_enum($index)
+Note: A quick overview of all export formats and options can be
+ptained by running the demo script I<examples/explist.pl> in the
+ZVBI package.
+
+=item $href = Video::ZVBI::export::info_enum($index)
 
 Enumerates all available export modules. You should start with
 I<$index> 0, incrementing until the function returns C<undef>.
@@ -1461,7 +1801,7 @@ libraries, thus the list can vary from session to session.
 On success the function returns a reference to an hash with the
 following elements: keyword, label, tooltip, mime_type, extension.
 
-=item $href = Video::Capture::ZVBI::export::info_keyword($keyword)
+=item $href = Video::ZVBI::export::info_keyword($keyword)
 
 Similar to the above function I<info_enum()>, this function returns
 info about available modules, although this one searches for an
@@ -1499,13 +1839,13 @@ identifies options based on the given I<$keyword>.
 =item $exp->option_set($keyword, $opt)
 
 Sets the value of the option named by I<$keword> to I<$opt>.
-Returns 0 on failure, 1 on success.
+Returns 0 on failure, 1 on success.  Example:
+
+  $exp->option_set('quality', 75.5);
 
 Note the expected type of the option value depends on the keyword.
 The ZVBI interface module automatically converts the option into
 type expected by the libzvbi library.
-
-Typical usage this function: C<$exp->option_set("quality", 75.5);>
 
 Mind that options of type C<VBI_OPTION_MENU> must be set by menu
 entry number (integer), all other options by value. If necessary
@@ -1531,10 +1871,10 @@ value of the option named by I<$keyword>, but returns this value as
 number of the corresponding menu entry. Naturally this must be an
 option with menu.
 
-=item $exp->stdio($fp, $pg)
+=item $exp->stdio($io, $pg)
 
 This function writes contents of the page given in I<$pg>, converted
-to the respective export module format, to the stream I<$fp>.
+to the respective export module format, to the stream I<$io>.
 The caller is responsible for opening and closing the stream,
 don't forget to check for I/O errors after closing. Note this
 function may write incomplete files when an error occurs.
@@ -1553,14 +1893,40 @@ The function returns 1 on success, else 0.
 You can call this function as many times as you want, it does not
 change state of the export or page objects.
 
-=item $exp->errstr()
+=item $data = $exp->alloc($pg)
 
-After an export function failed, this function returns a string
+This functions renders the page I<$pg> and returns it as a (byte-)string.
+Returns undef if the function fails.
+
+B<Available:> since libzvbi version 0.2.26
+
+=item $size = $exp->mem($data, $pg)
+
+This functions renders the page I<$pg> into scalar I<$data>. The size
+of the scalar must be large enough to hold all of the data. The result
+is -1 upon internal errors, or the size of the output. You must check
+if the size is larger then the length of I<$data>:
+
+  my $sz = $ex->mem($img, $page);
+  die "Export failed: ". $exp->errstr() ."\n" if $s < 0;
+  die "Export failed: Buffer too small.\n" if $sz > length($img);
+
+Usually you should get the same performance from the I<$exp-E<gt>alloc()>
+variant, which has much simpler semantics.  Note you can also use
+I<$exp-E<gt>alloc()> to determine the size.  For image formats without
+compression the output size will usually be the same for all pages
+with the same dimensions.
+
+B<Available:> since libzvbi version 0.2.26
+
+=item $text = $exp->errstr()
+
+When an export function failed, this function returns a string
 with a more detailed error description.
 
 =back
 
-=head1 Video::Capture::ZVBI::search
+=head1 Video::ZVBI::search
 
 The functions in this section allow to search across one or more
 Teletext pages in the cache for a given sub-string or a regular
@@ -1568,7 +1934,7 @@ expression.
 
 =over 4
 
-=item $search = vbi_search_new($vt, $pgno, $subno, $pattern, $casefold=0, $regexp=0, $progress=NULL, $user_data=NULL)
+=item $search = Video::ZVBI::new($vt, $pgno, $subno, $pattern, $casefold=0, $regexp=0, $progress=NULL, $user_data=NULL)
 
 Create a search context and prepare for searching the Teletext page
 cache with the given expression.  Regular expression searching supports
@@ -1586,12 +1952,16 @@ default is 0.
 Boolean I<$regexp> must be set to 1 when the search pattern is a regular
 expression; default is 0.
 
-If present, I<$progress> passes a reference to a function which will be
-called for each scanned page. When the function returns 0 the search
-is aborted.  The callback function receives as only parameter a
-reference to the search page; use I<$pg-E<gt>get_page_no()> to query
-the page number for a progress display.
-Note: the referenced page is only valid while inside of the
+If present, I<$progress> can be used to pass a reference to a function
+which will be called for each scanned page. When the function returns 0,
+the search is aborted.  The callback function receives as only parameter
+a reference to the search page.  Use I<$pg-E<gt>get_page_no()> to query
+the page number for a progress display.  Note due to internal limitations
+only 10 search callback functions can be registered in a script at the
+same time.  Callbacks are automatically unregistered when the search
+object is destroyed.
+
+B<Note:> The referenced page is only valid while inside of the
 callback function (i.e. you must not assign the reference to a
 variable outside if the scope of the handler function.)
 
@@ -1758,7 +2128,7 @@ set to a reference to the matching page.
 
 =back
 
-=head1 Miscellaneous (Video::Capture::ZVBI)
+=head1 Miscellaneous (Video::ZVBI)
 
 =over 4
 
@@ -1774,14 +2144,29 @@ and determine a function to print them. (Note: The kind and contents
 of messages logged by particular functions may change in the future.)
 
 Parameters:
-I<$mask> is a bit-wise OR of zero or more of the C<VBI_LOG_*>
-constants. The mask specifies which kind of information to log.
+I<$mask> specifies which kind of information to log.
+It's a bit-wise OR of zero or more of the constants
+C<VBI_LOG_ERROR>,
+C<VBI_LOG_WARNING>,
+C<VBI_LOG_NOTICE>,
+C<VBI_LOG_INFO>,
+C<VBI_LOG_DEBUG>,
+C<VBI_LOG_DRIVER>,
+C<VBI_LOG_DEBUG2>,
+C<VBI_LOG_DEBUG3>.
 I<$log_fn> is a reference to a function to be called with log
 messages. Omit this parameter to disable logging.
 
 The log handler is called with the following parameters: I<level>
-is one of the C<VBI_LOG_*> constants; I<$context>, I<$message>
-and, if given, I<$user_data>.
+is one of the C<VBI_LOG_*> constants; I<$context> which is a text
+string describing the module where the event occured; I<$message>
+the actual error message; finally, if passed during callback
+definition, a I<$user_data> parameter.
+
+Note only 10 event log functions can be registered in a script
+at the same time.
+
+B<Available:> since libzvbi version 0.2.22
 
 =item set_log_on_stderr($mask)
 
@@ -1793,6 +2178,8 @@ constants. The mask specifies which kind of information to log.
 
 To disable logging call C<set_log_fn(0)>, i.e. without passing
 a callback function reference.
+
+B<Available:> since libzvbi version 0.2.22
 
 =item par8(val)
 
@@ -1891,10 +2278,14 @@ contains hex digits 0xA ... 0xF.
 This function receives a sliced VPS line and returns a 16-bit CNI value,
 or undef in case of errors.
 
+B<Available:> since libzvbi version 0.2.22
+
 =item vbi_encode_vps_cni(cni)
 
 This function receives a 16-bit CNI value and returns a VPS line,
 or undef in case of errors.
+
+B<Available:> since libzvbi version 0.2.22
 
 =item rating_string($auth, $id)
 
@@ -1929,6 +2320,8 @@ replacement for characters which are not representable in UTF-8
 code value.) When omitted or zero, the function will fail if the
 source buffer contains unrepresentable characters.
 
+B<Available:> since libzvbi version 0.2.23
+
 =item $str = caption_unicode($c [, $to_upper] )
 
 Converts a single Closed Caption character code into an UTF-8 string.
@@ -1946,11 +2339,13 @@ into upper case. (Often programs are captioned in all upper case, but
 except for one character the basic and special CC character sets contain
 only lower case accented characters.)
 
+B<Available:> since libzvbi version 0.2.23
+
 =back
 
 =head1 EXAMPLES
 
-The C<examples> sub-directory in the B<Video::Capture::ZVBI> package
+The C<examples> sub-directory in the B<Video::ZVBI> package
 contains a number of scripts used to test the various interface
 functions. You can also use them as examples for your code:
 
@@ -1959,9 +2354,9 @@ functions. You can also use them as examples for your code:
 =item capture.pl
 
 This is a translation of C<test/capture.c> in the libzvbi package.
-Captures sliced VBI data from a device.  Output can be written to a
-file or passed via stdout into one of the following example scripts.
-Call with option C<--help> for a list of options.
+The script captures sliced VBI data from a device.  Output can be
+written to a file or passed via stdout into one of the following
+example scripts.  Call with option C<--help> for a list of options.
 
 =item decode.pl
 
@@ -2032,6 +2427,13 @@ entered.
 
 The script captures from C</dev/vbi0> and displays teletext pages in
 a small GUI using Perl::Tk.
+
+=item osc.pl
+
+This script is loosely based on C<test/osc.c> in the libzvbi package.
+The script captures raw VBI data from a device and displays the data as
+an animated gray-scale image. One selected line is plotted and the decoded
+teletext or VPS Data of that line is shown.
 
 =back
 

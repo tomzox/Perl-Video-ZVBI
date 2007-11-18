@@ -1,9 +1,9 @@
 ZVBI library interface module
 -----------------------------
 
-Name:           Video::Capture::ZVBI
+Name:           Video-ZVBI
 Version:        0.2.0
-Date:           October 2007
+Date:           November 2007
 
 DLSIP-code:     bcdOg
                 - development stage: beta testing
@@ -22,7 +22,7 @@ Description
 
 This module provides a Perl interface to the ZVBI library.  The ZVBI
 library allows to access broadcast data services such as teletext or
-closed captions via analog or DVB video capture devices.
+closed caption via analog video or DVB capture devices.
 
 Official ZVBI library description:
 
@@ -47,37 +47,36 @@ at <http://zapping.sourceforge.net/doc/libzvbi/index.html> and the
 examples scripts provided in the example/ subdirectory: these are
 more or less direct C to Perl ports of the respective programs in
 the test/ subdirectory of the libzvbi sources with a few additions,
-such as a teletext level 2.5 browser implemented in ~200 lines of
+such as a teletext level 2.5 browser implemented in ~300 lines of
 Perl::Tk.
 
 
-Comparison with the Video-Capture::VBI module
+Comparison with the Video-Capture-VBI module
 ---------------------------------------------
 
 You may have noticed that there already is a Perl VBI module which
-provides very similar functionality.  The reason that a separate
-module was created is that the approach is completely different:
-the VBI module contains an actual implementation of a teletext and
-VPS slicers and databases, while ZVBI is just an interface layer.
+provides very similar functionality.  The approach is completely
+different though: The older VBI module contains an actual implementation
+of a teletext and VPS slicers and databases, while ZVBI is an interface
+layer to an external C library.
 
-libzvbi is a very sophisticated and up-to-date implementation and
-as such supports a wide range of platforms, drivers and data services.
-The library is actively maintained by Michael Schimek, who was one
-of the authors of the VBI interfaces in V4L and V4L2 (i.e. the Linux
-video capture API.)  In contrast, most of the VBI module's code
-appears to date back at least to 1999.  To update it to the status
-quo of libzvbi would have meant to either reinvent the wheel, i.e.
-solve problems that are already solved in libzvbi (e.g. support for
-capture chips with different sampling rates such as Philips SAA7134
-and support for V4l2), or to duplicate code from libzvbi into the
-VBI module.  That would have been much more effort and certainly
-less elegant than just creating an interface to libzvbi.
+Besides that, the reason for not just contributing code to the
+existing module was that libzvbi alone can almost entirely replace
+the older VBI module (i.e. it covers the same functionality, except
+currently for the high-level "nexTView" EPG decoding.)  So there would
+not much to be gained by merging the code. On the other hand, libzvbi
+supports much more platforms, drivers (e.g. V4L2, DVB, BSD) and services,
+so that it seems warranted to make that available to the Perl universe.
 
-Other benefits are that libzvbi has extensive documentation and is
-optimized for performance (i.e. the ZVBI Perl module is several times
-times faster when capturing teletext packets into a file compared
-to the VBI module.)  The only downside is EPG decoding (ETS 300 707),
-which is supported by the VBI module, but not by libzvbi.
+
+BETA WARNING
+------------
+
+This module is still a beta release. Hence interfaces may change in
+in incompatible ways or even interfaces may be renamed. If you plan
+to use this module in a large project please let me know. Once the
+module has been validated in a larger project the beta status may
+be terminated.
 
 
 Installation
@@ -91,6 +90,8 @@ in the usual steps:
 perl Makefile.PL
 make
 make install
+
+Note there are no dependencies on other Perl modules.
 
 
 Bug Reports

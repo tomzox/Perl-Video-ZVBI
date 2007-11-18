@@ -19,11 +19,11 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# $Id$
+# $Id: search-ttx.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 
 use strict;
 use blib;
-use Video::Capture::ZVBI;
+use Video::ZVBI qw(/^VBI_/);
 
 my $cr;
 
@@ -50,55 +50,70 @@ sub search {
       my $srch;
       my $pg;
       my $stat;
-      my $any_sub = Video::Capture::ZVBI::VBI_ANY_SUBNO;
+      my $any_sub = VBI_ANY_SUBNO;
       my $last_page;
       my $last_sub;
 
       my $rand = [int(rand(1000))];
       print "Search rand user data $rand->[0]\n";
-      $srch = Video::Capture::ZVBI::search::new($vtdec, 0x100, $any_sub, $pat, 0, 0, \&progress, $rand);
+      $srch = Video::ZVBI::search::new($vtdec, 0x100, $any_sub, $pat, 0, 0, \&progress, $rand);
       die "failed to initialize search: $!\n" unless $srch;
 
-      while (($stat = $srch->next($pg, 1)) == Video::Capture::ZVBI::VBI_SEARCH_SUCCESS) {
+      while (($stat = $srch->next($pg, 1)) == VBI_SEARCH_SUCCESS) {
          # match found
          my ($page,$sub) = $pg->get_page_no();
          if (!defined($last_page) || !defined($last_sub) ||
              ($page != $last_page) || ($sub != $last_sub)) {
+
             printf "\nFound match: %03X.%04X\n", $page, $sub;
+            my ($rows, $cols) = $pg->get_page_size();
             my $txt = $pg->get_page_text();
-            print "$txt\n";
+            for (my $row = 0; $row < $rows; $row++) {
+               print substr($txt, $row*$cols, $cols) . "\n";
+            }
             $last_page = $page;
             $last_sub = $sub;
          }
       }
       print "\n";
-      die "search \"$pat\": $stat" unless $stat == Video::Capture::ZVBI::VBI_SEARCH_NOT_FOUND;
+      die "search \"$pat\": result code $stat\n" unless $stat == VBI_SEARCH_NOT_FOUND;
    }
 }
 
 sub main_func {
    my $opt_device = "/dev/vbi0";
    my $opt_buf_count = 5;
-   my $opt_services = Video::Capture::ZVBI::VBI_SLICED_TELETEXT_B;
+   my $opt_services = VBI_SLICED_TELETEXT_B;
    my $opt_strict = 0;
-   my $opt_debug_level = 0;
+   my $opt_verbose = 0;
    my $err;
+   my $pxc;
    my $cap;
    my $vtdec;
    my $exp;
 
-   $cap = Video::Capture::ZVBI::capture::v4l2_new($opt_device, $opt_buf_count, $opt_services, $opt_strict, $err, $opt_debug_level);
+   $pxc = Video::ZVBI::proxy::create($opt_device, $0, 0, $err, $opt_verbose);
+   if (defined $pxc) {
+      $cap = Video::ZVBI::capture::proxy_new($pxc, 5, 0, $opt_services, $opt_strict, $err);
+      undef $pxc unless defined $cap;
+   }
    if (!defined $cap) {
-      $cap = Video::Capture::ZVBI::capture::v4l_new($opt_device, 0, $opt_services, $opt_strict, $err, $opt_debug_level);
+      $cap = Video::ZVBI::capture::v4l2_new($opt_device, $opt_buf_count, $opt_services, $opt_strict, $err, $opt_verbose);
+   }
+   if (!defined $cap) {
+      $cap = Video::ZVBI::capture::v4l_new($opt_device, 0, $opt_services, $opt_strict, $err, $opt_verbose);
+   }
+   if (!defined $cap) {
+      $cap = Video::ZVBI::capture::bktr_new($opt_device, 0, $opt_services, $opt_strict, $err, $opt_verbose);
    }
    die "Failed to open video device: $err\n" unless $cap;
 
    $cr = (-t STDERR) ? "\r" : "\n";
 
-   $vtdec = Video::Capture::ZVBI::vt::decoder_new();
+   $vtdec = Video::ZVBI::vt::decoder_new();
    die "failed to create teletext decoder: $!\n" unless defined $vtdec;
 
-   $vtdec->event_handler_register(Video::Capture::ZVBI::VBI_EVENT_TTX_PAGE, \&pg_handler, $cr); 
+   $vtdec->event_handler_register(VBI_EVENT_TTX_PAGE, \&pg_handler, $cr); 
 
    print STDERR "Press RETURN to stop capture and enter a search pattern\n";
 

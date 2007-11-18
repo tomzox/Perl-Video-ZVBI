@@ -20,7 +20,7 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# Perl $Id$
+# Perl $Id: caption.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
 # ZVBI #Id: caption.c,v 1.14 2006/05/22 08:57:05 mschimek Exp #
 
 #
@@ -32,7 +32,7 @@ use strict;
 use IO::Handle;
 use Switch;
 use Tk;
-use Video::Capture::ZVBI qw(/^VBI_/);
+use Video::ZVBI qw(/^VBI_/);
 
 my $vbi;
 my $pgno = -1;
@@ -113,7 +113,7 @@ sub draw_row {
                 # create RGBA image of the character sequence
                 my $vbi_canvas;
                 my $fmt;
-                if (Video::Capture::ZVBI::check_lib_version(0,2,26)) {
+                if (Video::ZVBI::check_lib_version(0,2,26)) {
                         $fmt = VBI_PIXFMT_PAL8;
                 } else {
                         $fmt = VBI_PIXFMT_RGBA32_LE;
@@ -315,7 +315,6 @@ sub pes_mainloop {
 
                         $n_lines = $dx->cor ($sliced, 64, $pts, $buffer, $bytes_left);
                         if ($n_lines > 0) {
-                                print "DECODE $n_lines\n";
                                 $vbi->decode ($sliced, $n_lines, $pts / 90000.0);
                         }
                 }
@@ -364,8 +363,8 @@ sub cmd {
 
         $sliced = pack "LLCCx54", VBI_SLICED_CAPTION_525,
                                   21,
-                                  Video::Capture::ZVBI::par8 ($n >> 8),
-                                  Video::Capture::ZVBI::par8 ($n & 0x7F);
+                                  Video::ZVBI::par8 ($n >> 8),
+                                  Video::ZVBI::par8 ($n & 0x7F);
 
         push @sim_buf, ["sliced", $sliced, $cmd_time];
         #$vbi->decode ($sliced, 1, $cmd_time);
@@ -659,7 +658,7 @@ sub main_func {
         init_window ();
 
         # create a decoder context and enable Closed Captioning decoding
-        $vbi = Video::Capture::ZVBI::vt::decoder_new ();
+        $vbi = Video::ZVBI::vt::decoder_new ();
         die "Failed to create VT decoder\n" unless defined $vbi;
 
         $success = $vbi->event_handler_add (VBI_EVENT_CAPTION, \&cc_handler);
@@ -676,11 +675,11 @@ sub main_func {
                 $infile = new IO::Handle;
                 $infile->fdopen(fileno(STDIN), "r");
 
-                my $c = ord($infile->getc());
+                my $c = ord($infile->getc() || 1);
                 $infile->ungetc($c);
 
                 if (0 == $c) {
-                        $dx = Video::Capture::ZVBI::dvbdemux::new ();
+                        $dx = Video::ZVBI::dvb_demux::pes_new ();
                         die "Failed to create DVB demuxer\n" unless defined $dx;
 
                         $tk->after(20, \&pes_mainloop);
