@@ -11,7 +11,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * $Id: ZVBI.xs,v 1.1 2007/11/18 19:34:14 tom Exp tom $
+ * $Id: ZVBI.xs,v 1.2 2007/11/19 21:15:00 tom Exp tom $
  */
 
 #include "EXTERN.h"
@@ -107,11 +107,22 @@ typedef struct {
 #define GET_CANVAS_TYPE(FMT)    (sizeof(vbi_rgba))
 #endif
 
+#if !defined(UTF8_MAXBYTES)
+#define UTF8_MAXBYTES 4         /* max length of an UTF-8 encoded Unicode character */
+#endif
+
 /*
  * Static storage for callback function references
  */
+#if defined (MY_CXT)
 #define MY_CXT_KEY "Video::ZVBI::_statics" XS_VERSION
-#define ZVBI_MAX_CB_COUNT   10
+
+#else /* versions older than Perl 5.8 didn't support thread-safe static data */
+#define START_MY_CXT    static my_cxt_t zvbi_xs_my_cxt;
+#define dMY_CXT         extern int __unused_dMY_CXT
+#define MY_CXT_INIT
+#define MY_CXT          zvbi_xs_my_cxt
+#endif
 
 /*
  * Structure which is used to store callback function references and user data.
@@ -124,6 +135,8 @@ typedef struct
         SV *            p_data;
         void *          p_obj;
 } zvbi_xs_cb_t;
+
+#define ZVBI_MAX_CB_COUNT   10
 
 typedef struct {
         zvbi_xs_cb_t    event[ZVBI_MAX_CB_COUNT];
@@ -699,14 +712,29 @@ static int zvbi_xs_search_progress_0( vbi_page * p_pg ) { return zvbi_xs_search_
 static int zvbi_xs_search_progress_1( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 1); }
 static int zvbi_xs_search_progress_2( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 2); }
 static int zvbi_xs_search_progress_3( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 3); }
+static int zvbi_xs_search_progress_4( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 4); }
+static int zvbi_xs_search_progress_5( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 5); }
+static int zvbi_xs_search_progress_6( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 6); }
+static int zvbi_xs_search_progress_7( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 7); }
+static int zvbi_xs_search_progress_8( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 8); }
+static int zvbi_xs_search_progress_9( vbi_page * p_pg ) { return zvbi_xs_search_progress(p_pg, 9); }
 
-static int (* const zvbi_xs_search_cb_list[])( vbi_page * pg ) =
+static int (* const zvbi_xs_search_cb_list[ZVBI_MAX_CB_COUNT])( vbi_page * pg ) =
 {
         zvbi_xs_search_progress_0,
         zvbi_xs_search_progress_1,
         zvbi_xs_search_progress_2,
-        zvbi_xs_search_progress_3
+        zvbi_xs_search_progress_3,
+        zvbi_xs_search_progress_4,
+        zvbi_xs_search_progress_5,
+        zvbi_xs_search_progress_6,
+        zvbi_xs_search_progress_7,
+        zvbi_xs_search_progress_8,
+        zvbi_xs_search_progress_9,
 };
+#if (ZVBI_MAX_CB_COUNT) != 10
+#error "Search progress callback function list length mismatch"
+#endif
 
 /*
  * Invoke callback in DVB PES de-multiplexer to process sliced data.
@@ -1417,7 +1445,8 @@ vbi_capture_bktr_new(dev_name, scanning, srv, strict, errorstr, trace)
         errorstr
         RETVAL
 
-int vbi_capture_dvb_filter(cap, pid)
+int
+vbi_capture_dvb_filter(cap, pid)
         VbiCaptureObj * cap
         int pid
 
@@ -2421,8 +2450,9 @@ page_title(vbi, pgno, subno)
         VbiVtObj * vbi
         int pgno
         int subno
-        PPCODE:
+        PREINIT:
         char buf[42];
+        PPCODE:
         if (vbi_page_title(vbi->ctx, pgno, subno, buf)) {
                 EXTEND(sp, 1);
                 PUSHs (sv_2mortal(newSVpv(buf, strlen(buf))));
@@ -2441,8 +2471,8 @@ event_handler_add(vbi, event_mask, handler, user_data=NULL)
         CODE:
         if (vbi->old_ev_cb != NULL) {
                 warn("Video::ZVBI::vt is overwriting a previous event handler\n"
-                     "Call event_handler_remove or "
-                     "use event_handler_register instead when using multiple callbacks\n");
+                     "Call event_handler_remove to suppress this warning or\n"
+                     "use event_handler_register instead when using multiple callbacks.\n");
                 Save_SvREFCNT_dec(vbi->old_ev_cb);
                 Save_SvREFCNT_dec(vbi->old_ev_user_data);
                 vbi->old_ev_cb = NULL;
@@ -2457,7 +2487,7 @@ event_handler_add(vbi, event_mask, handler, user_data=NULL)
         RETVAL
 
 void
-event_handler_remove(vbi, handler=NULL)
+event_handler_remove(vbi, handler)
         VbiVtObj * vbi
         CV * handler
         CODE:

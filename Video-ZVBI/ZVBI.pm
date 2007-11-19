@@ -17,7 +17,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: ZVBI.pm,v 1.1 2007/11/18 19:33:38 tom Exp tom $
+# $Id: ZVBI.pm,v 1.2 2007/11/19 21:42:08 tom Exp tom $
 #
 
 package Video::ZVBI;
@@ -29,7 +29,7 @@ require Exporter;
 require DynaLoader;
 
 our @ISA = ('Exporter', 'DynaLoader');
-our $VERSION = "0.2.0";
+our $VERSION = "0.2.1";  # update README upon increments
 our @EXPORT = qw();
 our @EXPORT_OK = qw();  # filled by XSUB
 
@@ -1340,7 +1340,9 @@ in calls to the event handler function.
 B<Depreceated:>
 This function removes an event handler function (if any) which was
 previously installed via I<$vtE<gt>event_handler_add()>.
-The I<$handler> parameter is optional, as it is not used.
+Parameter I<$handler> is a reference to the event handler which is
+to be removed (currently ignored as only one handler can be installed.)
+
 Use I<event_handler_register()> and I<event_handler_unregister()>
 in new code instead.
 

@@ -1,0 +1,8 @@
+Revision history for Perl extension Video::ZVBI
+
+0.2.1 2007-Nov-19
+	* ZVBI.xs: Compatibility fixes for older Perl versions;
+	Syntax fixes; Bugfix in search callback function array
+
+0.2.0 2007-Nov-18
+	* : First official release (CPAN)
