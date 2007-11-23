@@ -86,9 +86,8 @@ be terminated.
 
 Pre-requisite to the installation is the
 [libzvbi library](http://zapping.sourceforge.net/ZVBI/index.html)
-(you need a development package which includes the `libzvbi.h` header file)
-and a C compiler.  If you have these already, installation is done
-in the usual steps:
+(oldest supported version is 0.2.16) and a C compiler. If you have these
+already, installation is done in the usual steps:
 
 ```console
     perl Makefile.PL
@@ -99,6 +98,12 @@ in the usual steps:
 Note there are no dependencies on other Perl modules by the module itself.
 Some of provided example scripts however depend on
 [Perl::Tk](https://metacpan.org/pod/Tcl::Tk)
+
+Trouble-shooting note: By default the module compiles against an
+internal copy of libzvbi.h and loads symbols added in recent library
+versions during module start from the shared library. If your compiled
+module doesn't load, try disabling the respective compile switches
+in Makefile.PL
 
 ## Bug reports
 

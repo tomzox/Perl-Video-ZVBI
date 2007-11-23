@@ -17,7 +17,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: ZVBI.pm,v 1.2 2007/11/19 21:42:08 tom Exp tom $
+# $Id: ZVBI.pm,v 1.3 2007/11/23 22:20:46 tom Exp tom $
 #
 
 package Video::ZVBI;
@@ -25,11 +25,13 @@ package Video::ZVBI;
 use strict;
 use warnings;
 
+use 5.7.1;  # uvuni_to_utf8 - note: also in Makefile.PL and Meta.yml
+
 require Exporter;
 require DynaLoader;
 
 our @ISA = ('Exporter', 'DynaLoader');
-our $VERSION = "0.2.1";  # update README upon increments
+our $VERSION = "0.2.2";  # remember to update README and Meta.yml too
 our @EXPORT = qw();
 our @EXPORT_OK = qw();  # filled by XSUB
 

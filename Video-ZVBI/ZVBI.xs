@@ -11,7 +11,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * $Id: ZVBI.xs,v 1.2 2007/11/19 21:15:00 tom Exp tom $
+ * $Id: ZVBI.xs,v 1.3 2007/11/23 22:24:39 tom Exp tom $
  */
 
 #include "EXTERN.h"
@@ -23,7 +23,15 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 
-#include "libzvbi.h"
+#if defined (USE_DL_SYM)
+#include <dlfcn.h>
+#endif
+
+#if defined (USE_LIBZVBI_INT)
+#include "libzvbi_int.h"
+#else
+#include <libzvbi.h>
+#endif
 
 /* macro to check for a minimum libzvbi version number */
 #define LIBZVBI_VERSION(A,B,C) \
@@ -33,6 +41,10 @@
 
 /* abort the calling Perl script if an unsupported function is referenced */
 #define CROAK_LIB_VERSION(A,B,C) croak("Not supported before libzvbi version " #A "." #B "." #C)
+
+#if !(LIBZVBI_VERSION(0,2,16))
+#error "Minimum version for libzvbi is 0.2.16"
+#endif
 
 /*
  *  Types of object classes. Note the class name using in blessing is
@@ -71,6 +83,7 @@ typedef struct vbi_dvb_demux_obj_struct {
         SV *            log_user_data;
 } VbiDvb_DemuxObj;
 
+#if LIBZVBI_VERSION(0,2,14)
 typedef struct vbi_idl_demux_obj_struct {
         vbi_idl_demux * ctx;
         SV *            demux_cb;
@@ -82,6 +95,7 @@ typedef struct vbi_pfc_demux_obj_struct {
         SV *            demux_cb;
         SV *            demux_user_data;
 } VbiPfc_DemuxObj;
+#endif
 
 typedef struct vbi_xds_demux_obj_struct {
         vbi_xds_demux * ctx;
@@ -214,6 +228,130 @@ zvbi_xs_free_callback_by_obj( zvbi_xs_cb_t * p_list, void * p_obj )
                 }
         }
 }
+
+#if defined (USE_DL_SYM)
+static struct {
+#if LIBZVBI_VERSION(0,2,20)
+        vbi_bool (*decode_vps_cni)
+                                        (unsigned int *         cni,
+                                        const uint8_t           buffer[13]);
+        vbi_bool (*encode_vps_cni)
+                                        (uint8_t                buffer[13],
+                                        unsigned int            cni);
+#endif
+#if LIBZVBI_VERSION(0,2,22)
+        void (*dvb_demux_set_log_fn)    (vbi_dvb_demux *        dx,
+                                         vbi_log_mask           mask,
+                                         vbi_log_fn *           log_fn,
+                                         void *                 user_data);
+        void (*set_log_fn)              (vbi_log_mask           mask,
+                                        vbi_log_fn *            log_fn,
+                                        void *                  user_data);
+        vbi_log_fn *                    log_on_stderr;
+#endif
+#if LIBZVBI_VERSION(0,2,23)
+        char * (*strndup_iconv_caption)
+                                        (const char *           dst_codeset,
+                                        const char *            src,
+                                        long                    src_length,
+                                        int                     repl_char);
+        unsigned int (*caption_unicode)
+                                        (unsigned int           c,
+                                        vbi_bool                to_upper);
+#endif
+#if LIBZVBI_VERSION(0,2,26)
+        vbi_bool (*idl_demux_feed_frame)
+                                        (vbi_idl_demux *        dx,
+                                        const vbi_sliced *      sliced,
+                                        unsigned int            n_lines);
+        vbi_bool (*pfc_demux_feed_frame)
+                                        (vbi_pfc_demux *        dx,
+                                        const vbi_sliced *      sliced,
+                                        unsigned int            n_lines);
+        vbi_bool (*xds_demux_feed_frame)
+                                        (vbi_xds_demux *        xd,
+                                        const vbi_sliced *      sliced,
+                                        unsigned int            n_lines);
+        ssize_t (*export_mem)
+                                        (vbi_export *           e,
+                                        void *                  buffer,
+                                        size_t                  buffer_size,
+                                        const vbi_page *        pg);
+        void * (*export_alloc)
+                                        (vbi_export *           e,
+                                        void **                 buffer,
+                                        size_t *                buffer_size,
+                                        const vbi_page *        pg);
+#endif
+} zvbi_xs_symbols;
+
+#define zvbi_(NAME) zvbi_xs_symbols.NAME
+
+#define LOAD_LIBZVBI_SYM(A,B,C,NAME) \
+        do{ zvbi_(NAME) = dlsym(dl, "vbi_" #NAME); }while(0)
+
+#define CHECK_LIBZVBI_SYM(A,B,C,NAME) \
+        do {if (zvbi_(NAME) == NULL) { \
+                croak("vbi_" #NAME ": Not supported before libzvbi version " #A "." #B "." #C); \
+                XSRETURN_UNDEF; \
+        }}while(0)
+
+static vbi_bool
+zvbi_xs_load_optional_symbols( void )
+{
+        void * dl;
+
+        memset(&zvbi_xs_symbols, 0, sizeof(zvbi_xs_symbols));
+
+        dl = dlopen(LIBZVBI_PATH, RTLD_LAZY);
+        if (dl == NULL) {
+                dl = dlopen("libzvbi.so", RTLD_LAZY);
+        }
+        if (dl == NULL) {
+                croak("Failed to load " LIBZVBI_PATH " library\n");
+                return FALSE;
+        }
+
+#if LIBZVBI_VERSION(0,2,20)
+        LOAD_LIBZVBI_SYM(0,2,20, decode_vps_cni);
+        LOAD_LIBZVBI_SYM(0,2,20, encode_vps_cni);
+#endif
+#if LIBZVBI_VERSION(0,2,22)
+        LOAD_LIBZVBI_SYM(0,2,22, dvb_demux_set_log_fn);
+        LOAD_LIBZVBI_SYM(0,2,22, set_log_fn);
+        LOAD_LIBZVBI_SYM(0,2,22, log_on_stderr);
+#endif
+#if LIBZVBI_VERSION(0,2,23)
+        LOAD_LIBZVBI_SYM(0,2,23, strndup_iconv_caption);
+        LOAD_LIBZVBI_SYM(0,2,23, caption_unicode);
+#endif
+#if LIBZVBI_VERSION(0,2,26)
+        LOAD_LIBZVBI_SYM(0,2,26, idl_demux_feed_frame);
+        LOAD_LIBZVBI_SYM(0,2,26, pfc_demux_feed_frame);
+        LOAD_LIBZVBI_SYM(0,2,26, xds_demux_feed_frame);
+        LOAD_LIBZVBI_SYM(0,2,26, export_mem);
+        LOAD_LIBZVBI_SYM(0,2,26, export_alloc);
+#endif
+
+        dlclose(dl);
+        return TRUE;
+}
+#else /* !USE_DL_SYM */
+
+#define CHECK_LIBZVBI_SYM(A,B,C,NAME) \
+        do { \
+                croak("vbi_" #NAME ": Not supported before libzvbi version " #A "." #B "." #C); \
+                XSRETURN_UNDEF; \
+        }while(0)
+
+#define zvbi_(NAME) vbi_ ## NAME
+
+static vbi_bool
+zvbi_xs_load_optional_symbols( void )
+{
+        return TRUE;
+}
+#endif /* !USE_DL_SYM */
 
 
 #define hv_store_sv(HVPTR, NAME, SVPTR) hv_store (HVPTR, #NAME, strlen(#NAME), (SV*)(SVPTR), 0)
@@ -1238,9 +1376,8 @@ vbi_proxy_client_create(dev_name, p_client_name, client_flags, errorstr, trace_l
         int client_flags
         char * &errorstr = NO_INIT
         int trace_level
-        INIT:
-        errorstr = NULL;
         CODE:
+        errorstr = NULL;
         Newz(0, RETVAL, 1, VbiProxyObj);
         RETVAL->ctx = vbi_proxy_client_create(dev_name, p_client_name, client_flags,
                                               &errorstr, trace_level);
@@ -1828,12 +1965,11 @@ vbi_raw_decoder_resize(rd, start_a, count_a, start_b, count_b)
         PREINIT:
         int start[2];
         unsigned int count[2];
-        INIT:
+        CODE:
         start[0] = start_a;
         start[1] = start_b;
         count[0] = count_a;
         count[1] = count_b;
-        CODE:
         vbi_raw_decoder_resize(rd, start, count);
 
 int
@@ -1989,20 +2125,19 @@ vbi_dvb_demux_set_log_fn(dx, mask, log_fn=NULL, user_data=NULL)
         CV *                    log_fn
         SV *                    user_data
         CODE:
+        CHECK_LIBZVBI_SYM(0,2,22, dvb_demux_set_log_fn);
 #if LIBZVBI_VERSION(0,2,22)
         Save_SvREFCNT_dec(dx->log_cb);
         Save_SvREFCNT_dec(dx->log_user_data);
         if (log_fn != NULL) {
                 dx->log_cb = SvREFCNT_inc(log_fn);
                 dx->demux_user_data = SvREFCNT_inc(user_data);
-                vbi_dvb_demux_set_log_fn(dx->ctx, mask, zvbi_xs_dvb_log_handler, dx);
+                zvbi_(dvb_demux_set_log_fn)(dx->ctx, mask, zvbi_xs_dvb_log_handler, dx);
         } else {
                 dx->log_cb = NULL;
                 dx->log_user_data = NULL;
-                vbi_dvb_demux_set_log_fn(dx->ctx, mask, NULL, NULL);
+                zvbi_(dvb_demux_set_log_fn)(dx->ctx, mask, NULL, NULL);
         }
-#else
-        CROAK_LIB_VERSION(0,2,22);
 #endif
 
  # ---------------------------------------------------------------------------
@@ -2083,17 +2218,16 @@ vbi_idl_demux_feed_frame(dx, sv_sliced, n_lines)
         vbi_sliced * p_sliced;
         unsigned int max_lines;
         CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, idl_demux_feed_frame);
 #if LIBZVBI_VERSION(0,2,26)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
-                        vbi_idl_demux_feed_frame(dx->ctx, p_sliced, n_lines);
+                        zvbi_(idl_demux_feed_frame)(dx->ctx, p_sliced, n_lines);
                 } else {
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
                 }
         }
-#else
-        CROAK_LIB_VERSION(0,2,26);
 #endif
         OUTPUT:
         RETVAL
@@ -2178,17 +2312,16 @@ vbi_pfc_demux_feed_frame(dx, sv_sliced, n_lines)
         vbi_sliced * p_sliced;
         unsigned int max_lines;
         CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, pfc_demux_feed_frame);
 #if LIBZVBI_VERSION(0,2,26)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
-                        vbi_pfc_demux_feed_frame(dx->ctx, p_sliced, n_lines);
+                        zvbi_(pfc_demux_feed_frame)(dx->ctx, p_sliced, n_lines);
                 } else {
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
                 }
         }
-#else
-        CROAK_LIB_VERSION(0,2,26);
 #endif
         OUTPUT:
         RETVAL
@@ -2269,17 +2402,16 @@ vbi_xds_demux_feed_frame(xd, sv_sliced, n_lines)
         vbi_sliced * p_sliced;
         unsigned int max_lines;
         CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, xds_demux_feed_frame);
 #if LIBZVBI_VERSION(0,2,26)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
-                        vbi_xds_demux_feed_frame(xd->ctx, p_sliced, n_lines);
+                        zvbi_(xds_demux_feed_frame)(xd->ctx, p_sliced, n_lines);
                 } else {
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
                 }
         }
-#else
-        CROAK_LIB_VERSION(0,2,26);
 #endif
         OUTPUT:
         RETVAL
@@ -2343,7 +2475,7 @@ classify_page(vbi, pgno)
         PREINIT:
         vbi_page_type type;
         vbi_subno subno;
-        char *language;
+        char * language;
         PPCODE:
         type = vbi_classify_page(vbi->ctx, pgno, &subno, &language);
         EXTEND(sp, 3);
@@ -2762,8 +2894,9 @@ canvas_to_xpm(pg_obj, sv_canvas, fmt=VBI_PIXFMT_RGBA32_LE, aspect=1, img_pix_wid
 
 void
 get_max_rendered_size()
-        PPCODE:
+        PREINIT:
         int w, h;
+        PPCODE:
         vbi_get_max_rendered_size(&w, &h);
         EXTEND(sp, 2);
         PUSHs (sv_2mortal (newSVuv (w)));
@@ -2771,8 +2904,9 @@ get_max_rendered_size()
 
 void
 get_vt_cell_size()
-        PPCODE:
+        PREINIT:
         int w, h;
+        PPCODE:
         vbi_get_vt_cell_size(&w, &h);
         EXTEND(sp, 2);
         PUSHs (sv_2mortal (newSVuv (w)));
@@ -3157,15 +3291,14 @@ vbi_export_mem(exp, sv_buf, pg_obj)
         char * p_buf;
         STRLEN buf_size;
         CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, export_mem);
 #if LIBZVBI_VERSION(0,2,26)
         if (SvOK(sv_buf))  {
                 p_buf = SvPV_force(sv_buf, buf_size);
-                RETVAL = vbi_export_mem(exp, p_buf, buf_size + 1, pg_obj->p_pg);
+                RETVAL = zvbi_(export_mem)(exp, p_buf, buf_size + 1, pg_obj->p_pg);
         } else {
                 croak("Input buffer is undefined or not a scalar");
         }
-#else
-        CROAK_LIB_VERSION(0,2,26)
 #endif
         OUTPUT:
         sv_buf
@@ -3180,16 +3313,15 @@ vbi_export_alloc(exp, pg_obj)
         size_t buf_size;
         SV * sv;
         PPCODE:
+        CHECK_LIBZVBI_SYM(0,2,26, export_alloc);
 #if LIBZVBI_VERSION(0,2,26)
-        if (vbi_export_alloc(exp, (void**)&p_buf, &buf_size, pg_obj->p_pg)) {
+        if (zvbi_(export_alloc)(exp, (void**)&p_buf, &buf_size, pg_obj->p_pg)) {
                 sv = newSV(0);
                 sv_usepvn(sv, p_buf, buf_size);
                 /* now the pointer is managed by perl -> no free() */
                 EXTEND(sp, 1);
                 PUSHs (sv_2mortal (sv));
         }
-#else
-        CROAK_LIB_VERSION(0,2,26);
 #endif
 
 char *
@@ -3417,19 +3549,31 @@ MODULE = Video::ZVBI	PACKAGE = Video::ZVBI
 
 void
 lib_version()
+        PREINIT:
+        unsigned int major;
+        unsigned int minor;
+        unsigned int micro;
         PPCODE:
+        vbi_version(&major, &minor, &micro);
         EXTEND(sp, 3);
-        PUSHs (sv_2mortal (newSVuv (VBI_VERSION_MAJOR)));
-        PUSHs (sv_2mortal (newSVuv (VBI_VERSION_MINOR)));
-        PUSHs (sv_2mortal (newSVuv (VBI_VERSION_MICRO)));
+        PUSHs (sv_2mortal (newSVuv (major)));
+        PUSHs (sv_2mortal (newSVuv (minor)));
+        PUSHs (sv_2mortal (newSVuv (micro)));
 
 vbi_bool
-check_lib_version(major,minor,micro)
-        int major
-        int minor
-        int micro
+check_lib_version(need_major,need_minor,need_micro)
+        int need_major
+        int need_minor
+        int need_micro
+        PREINIT:
+        unsigned int lib_major;
+        unsigned int lib_minor;
+        unsigned int lib_micro;
         CODE:
-        RETVAL = LIBZVBI_VERSION(major,minor,micro);
+        vbi_version(&lib_major, &lib_minor, &lib_micro);
+        RETVAL = (lib_major > need_major) ||
+                 ((lib_major == need_major) && (lib_minor > need_minor)) ||
+                 ((lib_major == need_major) && (lib_minor == need_minor) && (lib_micro >= need_micro));
         OUTPUT:
         RETVAL
 
@@ -3442,21 +3586,20 @@ set_log_fn(mask, log_fn=NULL, user_data=NULL)
         dMY_CXT;
         unsigned cb_idx;
         CODE:
+        CHECK_LIBZVBI_SYM(0,2,22, set_log_fn);
 #if LIBZVBI_VERSION(0,2,22)
         zvbi_xs_free_callback_by_obj(MY_CXT.log, NULL);
         if (log_fn != NULL) {
                 cb_idx = zvbi_xs_alloc_callback(MY_CXT.log, (SV*)log_fn, user_data, NULL);
                 if (cb_idx < ZVBI_MAX_CB_COUNT) {
-                        vbi_set_log_fn(mask, zvbi_xs_log_callback, UINT2PVOID(cb_idx));
+                        zvbi_(set_log_fn)(mask, zvbi_xs_log_callback, UINT2PVOID(cb_idx));
                 } else {
-                        vbi_set_log_fn(mask, NULL, NULL);
+                        zvbi_(set_log_fn)(mask, NULL, NULL);
                         croak ("Max. log callback count exceeded");
                 }
         } else {
-                vbi_set_log_fn(mask, NULL, NULL);
+                zvbi_(set_log_fn)(mask, NULL, NULL);
         }
-#else
-        CROAK_LIB_VERSION(0,2,22);
 #endif
 
 void
@@ -3465,32 +3608,31 @@ set_log_on_stderr(mask)
         PREINIT:
         dMY_CXT;
         CODE:
+        CHECK_LIBZVBI_SYM(0,2,22, log_on_stderr);
 #if LIBZVBI_VERSION(0,2,22)
         zvbi_xs_free_callback_by_obj(MY_CXT.log, NULL);
-        vbi_set_log_fn(mask, vbi_log_on_stderr, NULL);
-#else
-        CROAK_LIB_VERSION(0,2,22);
+        zvbi_(set_log_fn)(mask, zvbi_(log_on_stderr), NULL);
 #endif
 
 void
 decode_vps_cni(data)
         SV * data
-        PPCODE:
-#if LIBZVBI_VERSION(0,2,20)
+        PREINIT:
         unsigned int cni;
         unsigned char *p;
         STRLEN len;
+        PPCODE:
+        CHECK_LIBZVBI_SYM(0,2,20, decode_vps_cni);
+#if LIBZVBI_VERSION(0,2,20)
         p = (unsigned char *)SvPV (data, len);
         if (len >= 13) {
-                if (vbi_decode_vps_cni(&cni, p)) {
+                if (zvbi_(decode_vps_cni)(&cni, p)) {
                         EXTEND(sp,1);
                         PUSHs (sv_2mortal (newSVuv (cni)));
                 }
         } else {
                 croak ("decode_vps_cni: input buffer must have at least 13 bytes");
         }
-#else
-        CROAK_LIB_VERSION(0,2,20);
 #endif
 
 void
@@ -3499,21 +3641,21 @@ encode_vps_cni(cni)
         PREINIT:
         uint8_t buffer[13];
         PPCODE:
+        CHECK_LIBZVBI_SYM(0,2,20, encode_vps_cni);
 #if LIBZVBI_VERSION(0,2,20)
-        if (vbi_encode_vps_cni(buffer, cni)) {
+        if (zvbi_(encode_vps_cni)(buffer, cni)) {
                 EXTEND(sp,1);
                 PUSHs (sv_2mortal (newSVpvn ((char*)buffer, 13)));
         }
-#else
-        CROAK_LIB_VERSION(0,2,20);
 #endif
 
 void
 rating_string(auth, id)
         int auth
         int id
-        PPCODE:
+        PREINIT:
         const char * p = vbi_rating_string(auth, id);
+        PPCODE:
         if (p != NULL) {
                 EXTEND(sp, 1);
                 PUSHs (sv_2mortal(newSVpv(p, strlen(p))));
@@ -3523,8 +3665,9 @@ void
 prog_type_string(classf, id)
         int classf
         int id
-        PPCODE:
+        PREINIT:
         const char * p = vbi_prog_type_string(classf, id);
+        PPCODE:
         if (p != NULL) {
                 EXTEND(sp, 1);
                 PUSHs (sv_2mortal(newSVpv(p, strlen(p))));
@@ -3540,9 +3683,10 @@ iconv_caption(sv_src, repl_char=0)
         STRLEN src_len;
         SV * sv;
         PPCODE:
+        CHECK_LIBZVBI_SYM(0,2,23, strndup_iconv_caption);
 #if LIBZVBI_VERSION(0,2,23)
         p_src = (void *) SvPV(sv_src, src_len);
-        p_buf = vbi_strndup_iconv_caption("UTF-8", p_src, src_len, '?');
+        p_buf = zvbi_(strndup_iconv_caption)("UTF-8", p_src, src_len, '?');
         if (p_buf != NULL) {
                 sv = newSV(0);
                 sv_usepvn(sv, p_buf, strlen(p_buf));
@@ -3551,8 +3695,6 @@ iconv_caption(sv_src, repl_char=0)
                 EXTEND(sp, 1);
                 PUSHs (sv_2mortal (sv));
         }
-#else
-        CROAK_LIB_VERSION(0,2,23);
 #endif
 
 void
@@ -3565,8 +3707,9 @@ caption_unicode(c, to_upper=0)
         U8 * p;
         SV * sv;
         PPCODE:
+        CHECK_LIBZVBI_SYM(0,2,23, caption_unicode);
 #if LIBZVBI_VERSION(0,2,23)
-        ucs = vbi_caption_unicode(c, to_upper);
+        ucs = zvbi_(caption_unicode)(c, to_upper);
         if (ucs != 0) {
                 p = uvuni_to_utf8(buf, ucs);
                 sv = sv_2mortal(newSVpvn(buf, p - buf));
@@ -3576,8 +3719,6 @@ caption_unicode(c, to_upper=0)
         }
         EXTEND(sp, 1);
         PUSHs (sv);
-#else
-        CROAK_LIB_VERSION(0,2,23);
 #endif
 
 BOOT:
@@ -3586,6 +3727,10 @@ BOOT:
         AV * exports;
 
         MY_CXT_INIT;
+
+        if (zvbi_xs_load_optional_symbols() == FALSE) {
+                return;
+        }
 
         exports = get_av("Video::ZVBI::EXPORT_OK", 1);
         if (exports == NULL) {
