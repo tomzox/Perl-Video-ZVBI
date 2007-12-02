@@ -19,7 +19,7 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# $Id: search-ttx.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
+# $Id: search-ttx.pl,v 1.2 2007/12/02 18:32:11 tom Exp tom $
 
 use strict;
 use blib;
@@ -94,8 +94,14 @@ sub main_func {
 
    $pxc = Video::ZVBI::proxy::create($opt_device, $0, 0, $err, $opt_verbose);
    if (defined $pxc) {
+      # work-around for bug in proxy_new() prior to libzvbi 0.2.26 which closed STDIN
+      open OLDSTDIN, "<&", \*STDIN;
+
       $cap = Video::ZVBI::capture::proxy_new($pxc, 5, 0, $opt_services, $opt_strict, $err);
       undef $pxc unless defined $cap;
+
+      open STDIN, "<&OLDSTDIN"; # work-around cntd.
+      close OLDSTDIN;
    }
    if (!defined $cap) {
       $cap = Video::ZVBI::capture::v4l2_new($opt_device, $opt_buf_count, $opt_services, $opt_strict, $err, $opt_verbose);
@@ -133,7 +139,9 @@ sub main_func {
       $res = $cap->pull_sliced($sliced, $n_lines, $timestamp, 1000);
       die "Capture error: $!\n" if $res < 0;
 
-      $vtdec->decode($sliced, $n_lines, $timestamp);
+      if ($res != 0) {
+         $vtdec->decode($sliced, $n_lines, $timestamp);
+      }
    }
 
    exit(-1);

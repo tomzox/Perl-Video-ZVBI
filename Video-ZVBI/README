@@ -2,7 +2,7 @@ ZVBI library interface module
 -----------------------------
 
 Name:           Video-ZVBI
-Version:        0.2.2
+Version:        0.2.3
 Date:           November 2007
 
 DLSIP-code:     bcdOg
@@ -82,9 +82,11 @@ be terminated.
 Installation
 ------------
 
-Pre-requisite to the installation is the libzvbi library (oldest
-supported version is 0.2.16) and a C compiler. If you have these
-already, installation is done in the usual steps:
+Pre-requisite to the installation is a C compiler and the libzvbi
+library (oldest supported version is 0.2.16, or 0.2.4 when disabling
+USE_DL_SYM in Makefile.PL) which in turn requires the pthreads and
+PNG libraries. Once you have these, installation is done in the
+usual steps:
 
 perl Makefile.PL
 make
@@ -95,8 +97,8 @@ Note there are no dependencies on other Perl modules.
 Trouble-shooting note: By default the module compiles against an
 internal copy of libzvbi.h and loads symbols added in recent library
 versions during module start from the shared library. If your compiled
-module doesn't load, try disabling the respective compile switches
-in Makefile.PL
+module doesn't load, try disabling compile switches USE_DL_SYM and
+USE_LIBZVBI_INT in Makefile.PL
 
 
 Bug Reports
@@ -117,7 +119,7 @@ version of libzvbi and which version of the Perl ZVBI module.
 Copyright
 ---------
 
-Copyright (C) 2006-2007 Th. "Tom" Zoerner. All rights reserved.
+Copyright (C) 2006-2007 Th. "Tom" Zoerner.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

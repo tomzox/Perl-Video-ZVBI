@@ -21,7 +21,7 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# Perl $Id: osc.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
+# Perl $Id: osc.pl,v 1.2 2007/12/02 18:31:10 tom Exp tom $
 # libzvbi #Id: osc.c,v 1.29 2006/10/08 06:19:48 mschimek Exp #
 
 use blib;
@@ -270,6 +270,8 @@ sub resize_window {
         }
         # create plot element
         $canvas_lid = $canvas->createLine(0, $src_h+$dst_h, 0, $src_h+$dst_h, -fill, '#ffffff');
+
+        draw() if $draw_count == 0;
 }
 
 sub init_window {
@@ -288,8 +290,8 @@ sub init_window {
 
         $canvas->Tk::bind('<Configure>', [\&resize_window, Ev('w'), Ev('h')]);
         $canvas->Tk::bind('<q>', sub {exit});
-        $canvas->Tk::bind('<Down>', sub {if ($draw_row+1<$src_h){$draw_row += 1;} Tk->break});
-        $canvas->Tk::bind('<Up>', sub {if ($draw_row>0){$draw_row -= 1;} Tk->break});
+        $canvas->Tk::bind('<Down>', sub {if ($draw_row+1<$src_h){$draw_row += 1;}; draw(); Tk->break});
+        $canvas->Tk::bind('<Up>', sub {if ($draw_row>0){$draw_row -= 1;}; draw(); Tk->break});
         $canvas->Tk::bind('<space>', sub {$draw_count = 1;});  # single-stepping
         $canvas->Tk::bind('<Return>', sub {$draw_count = -1;});  # live capture
         $canvas->bindtags([$canvas, 'all']);  # remove widget default bindings

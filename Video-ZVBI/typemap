@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2007 Tom Zoerner. All rights reserved.
+# Copyright (C) 2006-2007 Tom Zoerner.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: typemap,v 1.1 2007/11/18 18:48:51 tom Exp tom $
+# $Id: typemap,v 1.2 2007/12/02 18:43:08 tom Exp tom $
 #
 
 TYPEMAP
@@ -29,6 +29,8 @@ const char *		T_PV
 int64_t                 T_IV
 VBI_CHN_PRIO		T_IV
 VBI_CAPTURE_FD_FLAGS	T_IV
+vbi_service_set		T_UV
+vbi_videostd_set	T_UV
 
 # objects
 # (for some reason the INPUT/OUTPUT definitions are not found if the type name has more than 2 chars)
@@ -39,6 +41,7 @@ VbiRawDecObj *		PO
 VbiExportObj *		PO
 VbiSearchObj *		PO
 VbiPageObj *		PO
+VbiDvb_MuxObj *		PO
 VbiDvb_DemuxObj *	PO
 VbiIdl_DemuxObj *	PO
 VbiPfc_DemuxObj *	PO

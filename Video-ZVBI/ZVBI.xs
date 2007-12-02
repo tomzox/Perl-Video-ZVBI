@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2007 Tom Zoerner. All rights reserved.
+ * Copyright (C) 2006-2007 Tom Zoerner.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -11,7 +11,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * $Id: ZVBI.xs,v 1.3 2007/11/23 22:24:39 tom Exp tom $
+ * $Id: ZVBI.xs,v 1.4 2007/12/02 21:00:18 tom Exp tom $
  */
 
 #include "EXTERN.h"
@@ -29,21 +29,23 @@
 
 #if defined (USE_LIBZVBI_INT)
 #include "libzvbi_int.h"
+#define ZVBI_XS_MIN_MICRO 16
 #else
 #include <libzvbi.h>
+#define ZVBI_XS_MIN_MICRO 4
 #endif
 
-/* macro to check for a minimum libzvbi version number */
-#define LIBZVBI_VERSION(A,B,C) \
-   ((VBI_VERSION_MAJOR>(A)) || \
-    ((VBI_VERSION_MAJOR==(A)) && (VBI_VERSION_MINOR>(B))) || \
-    ((VBI_VERSION_MAJOR==(A)) && (VBI_VERSION_MINOR==(B)) && (VBI_VERSION_MICRO>=(C))))
+/* macro to check for a minimum libzvbi header file version number */
+#define LIBZVBI_H_VERSION(A,B,C) \
+        ((VBI_VERSION_MAJOR>(A)) || \
+        ((VBI_VERSION_MAJOR==(A)) && (VBI_VERSION_MINOR>(B))) || \
+        ((VBI_VERSION_MAJOR==(A)) && (VBI_VERSION_MINOR==(B)) && (VBI_VERSION_MICRO>=(C))))
 
 /* abort the calling Perl script if an unsupported function is referenced */
-#define CROAK_LIB_VERSION(A,B,C) croak("Not supported before libzvbi version " #A "." #B "." #C)
+#define CROAK_LIB_VERSION(A,B,C,NAME) croak("vbi_" #NAME ": Not supported before libzvbi version " #A "." #B "." #C)
 
-#if !(LIBZVBI_VERSION(0,2,16))
-#error "Minimum version for libzvbi is 0.2.16"
+#if !(LIBZVBI_H_VERSION(0,2,ZVBI_XS_MIN_MICRO))
+#error "Minimum version for libzvbi is 0.2." #ZVBI_XS_MIN_MICRO
 #endif
 
 /*
@@ -64,17 +66,28 @@ typedef struct {
         SV *            old_ev_user_data;
 } VbiVtObj;
 
+#if LIBZVBI_H_VERSION(0,2,9)
 typedef struct {
         vbi_proxy_client * ctx;
         SV *            proxy_cb;
         SV *            proxy_user_data;
 } VbiProxyObj;
+#endif
 
 typedef struct vbi_page_obj_struct {
         vbi_page *      p_pg;
         vbi_bool        do_free_pg;
 } VbiPageObj;
 
+#if LIBZVBI_H_VERSION(0,2,26)
+typedef struct vbi_dvb_mux_obj_struct {
+        vbi_dvb_mux *   ctx;
+        SV *            mux_cb;
+        SV *            mux_user_data;
+} VbiDvb_MuxObj;
+#endif
+
+#if LIBZVBI_H_VERSION(0,2,10)
 typedef struct vbi_dvb_demux_obj_struct {
         vbi_dvb_demux * ctx;
         SV *            demux_cb;
@@ -82,8 +95,9 @@ typedef struct vbi_dvb_demux_obj_struct {
         SV *            log_cb;
         SV *            log_user_data;
 } VbiDvb_DemuxObj;
+#endif
 
-#if LIBZVBI_VERSION(0,2,14)
+#if LIBZVBI_H_VERSION(0,2,14)
 typedef struct vbi_idl_demux_obj_struct {
         vbi_idl_demux * ctx;
         SV *            demux_cb;
@@ -97,11 +111,13 @@ typedef struct vbi_pfc_demux_obj_struct {
 } VbiPfc_DemuxObj;
 #endif
 
+#if LIBZVBI_H_VERSION(0,2,16)
 typedef struct vbi_xds_demux_obj_struct {
         vbi_xds_demux * ctx;
         SV *            demux_cb;
         SV *            demux_user_data;
 } VbiXds_DemuxObj;
+#endif
 
 typedef struct {
         unsigned int    l_services;
@@ -115,7 +131,7 @@ typedef struct {
 #define DRAW_TTX_CELL_HEIGHT    10
 #define DRAW_CC_CELL_WIDTH      16
 #define DRAW_CC_CELL_HEIGHT     26
-#if LIBZVBI_VERSION(0,2,26)
+#if LIBZVBI_H_VERSION(0,2,26)
 #define GET_CANVAS_TYPE(FMT)    (((FMT)==VBI_PIXFMT_PAL8) ? sizeof(uint8_t) : sizeof(vbi_rgba))
 #else
 #define GET_CANVAS_TYPE(FMT)    (sizeof(vbi_rgba))
@@ -231,7 +247,7 @@ zvbi_xs_free_callback_by_obj( zvbi_xs_cb_t * p_list, void * p_obj )
 
 #if defined (USE_DL_SYM)
 static struct {
-#if LIBZVBI_VERSION(0,2,20)
+#if LIBZVBI_H_VERSION(0,2,20)
         vbi_bool (*decode_vps_cni)
                                         (unsigned int *         cni,
                                         const uint8_t           buffer[13]);
@@ -239,7 +255,7 @@ static struct {
                                         (uint8_t                buffer[13],
                                         unsigned int            cni);
 #endif
-#if LIBZVBI_VERSION(0,2,22)
+#if LIBZVBI_H_VERSION(0,2,22)
         void (*dvb_demux_set_log_fn)    (vbi_dvb_demux *        dx,
                                          vbi_log_mask           mask,
                                          vbi_log_fn *           log_fn,
@@ -249,7 +265,7 @@ static struct {
                                         void *                  user_data);
         vbi_log_fn *                    log_on_stderr;
 #endif
-#if LIBZVBI_VERSION(0,2,23)
+#if LIBZVBI_H_VERSION(0,2,23)
         char * (*strndup_iconv_caption)
                                         (const char *           dst_codeset,
                                         const char *            src,
@@ -259,7 +275,7 @@ static struct {
                                         (unsigned int           c,
                                         vbi_bool                to_upper);
 #endif
-#if LIBZVBI_VERSION(0,2,26)
+#if LIBZVBI_H_VERSION(0,2,26)
         vbi_bool (*idl_demux_feed_frame)
                                         (vbi_idl_demux *        dx,
                                         const vbi_sliced *      sliced,
@@ -282,6 +298,61 @@ static struct {
                                         void **                 buffer,
                                         size_t *                buffer_size,
                                         const vbi_page *        pg);
+
+        vbi_dvb_mux * (*dvb_pes_mux_new)
+                                        (vbi_dvb_mux_cb *       callback,
+                                        void *                  user_data);
+        vbi_dvb_mux * (*dvb_ts_mux_new) (unsigned int           pid,
+                                        vbi_dvb_mux_cb *        callback,
+                                        void *                  user_data);
+        void (*dvb_mux_delete)          (vbi_dvb_mux *          mx);
+        void (*dvb_mux_reset)           (vbi_dvb_mux *          mx);
+        vbi_bool (*dvb_mux_cor)         (vbi_dvb_mux *          mx,
+                                        uint8_t **              buffer,
+                                        unsigned int *          buffer_left,
+                                        const vbi_sliced **     sliced,
+                                        unsigned int *          sliced_lines,
+                                        vbi_service_set         service_mask,
+                                        const uint8_t *         raw,
+                                        const vbi_sampling_par* sampling_par,   
+                                        int64_t                 pts);
+        vbi_bool (*dvb_mux_feed)        (vbi_dvb_mux *          mx,
+                                        const vbi_sliced *      sliced,
+                                        unsigned int            sliced_lines,
+                                        vbi_service_set         service_mask,
+                                        const uint8_t *         raw,
+                                        const vbi_sampling_par* sampling_par,
+                                        int64_t                 pts);
+        unsigned int (*dvb_mux_get_data_identifier)
+                                        (const vbi_dvb_mux *    mx);
+        vbi_bool (*dvb_mux_set_data_identifier) (vbi_dvb_mux *  mx,
+                                        unsigned int            data_identifier);
+        unsigned int (*dvb_mux_get_min_pes_packet_size)
+                                        (vbi_dvb_mux *          mx);
+        unsigned int (*dvb_mux_get_max_pes_packet_size)
+                                        (vbi_dvb_mux *          mx);
+        vbi_bool (*dvb_mux_set_pes_packet_size)
+                                        (vbi_dvb_mux *          mx,
+                                        unsigned int            min_size,
+                                        unsigned int            max_size);
+        vbi_bool (*dvb_multiplex_sliced)
+                                        (uint8_t **             packet,
+                                        unsigned int *          packet_left,
+                                        const vbi_sliced **     sliced,
+                                        unsigned int *          sliced_left,
+                                        vbi_service_set         service_mask,
+                                        unsigned int            data_identifier,
+                                        vbi_bool                stuffing);
+        vbi_bool (*dvb_multiplex_raw)   (uint8_t **             packet,
+                                        unsigned int *          packet_left,
+                                        const uint8_t **        raw,
+                                        unsigned int *          raw_left,
+                                        unsigned int            data_identifier,
+                                        vbi_videostd_set        videostd_set,
+                                        unsigned int            line,
+                                        unsigned int            first_pixel_position,
+                                        unsigned int            n_pixels_total,
+                                        vbi_bool                stuffing);
 #endif
 } zvbi_xs_symbols;
 
@@ -292,7 +363,9 @@ static struct {
 
 #define CHECK_LIBZVBI_SYM(A,B,C,NAME) \
         do {if (zvbi_(NAME) == NULL) { \
-                croak("vbi_" #NAME ": Not supported before libzvbi version " #A "." #B "." #C); \
+                unsigned int major, minor, micro; \
+                vbi_version(&major, &minor, &micro); \
+                croak("vbi_" #NAME ": Not supported before libzvbi version " #A "." #B "." #C " (have %d.%d.%d)\n", major, minor, micro); \
                 XSRETURN_UNDEF; \
         }}while(0)
 
@@ -312,25 +385,39 @@ zvbi_xs_load_optional_symbols( void )
                 return FALSE;
         }
 
-#if LIBZVBI_VERSION(0,2,20)
+#if LIBZVBI_H_VERSION(0,2,20)
         LOAD_LIBZVBI_SYM(0,2,20, decode_vps_cni);
         LOAD_LIBZVBI_SYM(0,2,20, encode_vps_cni);
 #endif
-#if LIBZVBI_VERSION(0,2,22)
+#if LIBZVBI_H_VERSION(0,2,22)
         LOAD_LIBZVBI_SYM(0,2,22, dvb_demux_set_log_fn);
         LOAD_LIBZVBI_SYM(0,2,22, set_log_fn);
         LOAD_LIBZVBI_SYM(0,2,22, log_on_stderr);
 #endif
-#if LIBZVBI_VERSION(0,2,23)
+#if LIBZVBI_H_VERSION(0,2,23)
         LOAD_LIBZVBI_SYM(0,2,23, strndup_iconv_caption);
         LOAD_LIBZVBI_SYM(0,2,23, caption_unicode);
 #endif
-#if LIBZVBI_VERSION(0,2,26)
+#if LIBZVBI_H_VERSION(0,2,26)
         LOAD_LIBZVBI_SYM(0,2,26, idl_demux_feed_frame);
         LOAD_LIBZVBI_SYM(0,2,26, pfc_demux_feed_frame);
         LOAD_LIBZVBI_SYM(0,2,26, xds_demux_feed_frame);
         LOAD_LIBZVBI_SYM(0,2,26, export_mem);
         LOAD_LIBZVBI_SYM(0,2,26, export_alloc);
+
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_pes_mux_new);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_ts_mux_new);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_delete);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_reset);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_cor);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_feed);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_get_data_identifier);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_set_data_identifier);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_get_min_pes_packet_size);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_get_max_pes_packet_size);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_mux_set_pes_packet_size);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_multiplex_sliced);
+        LOAD_LIBZVBI_SYM(0,2,26, dvb_multiplex_raw);
 #endif
 
         dlclose(dl);
@@ -338,11 +425,7 @@ zvbi_xs_load_optional_symbols( void )
 }
 #else /* !USE_DL_SYM */
 
-#define CHECK_LIBZVBI_SYM(A,B,C,NAME) \
-        do { \
-                croak("vbi_" #NAME ": Not supported before libzvbi version " #A "." #B "." #C); \
-                XSRETURN_UNDEF; \
-        }while(0)
+#define CHECK_LIBZVBI_SYM(A,B,C,NAME)
 
 #define zvbi_(NAME) vbi_ ## NAME
 
@@ -560,9 +643,11 @@ zvbi_xs_event_to_hv( HV * hv, vbi_event * ev )
         } else if (ev->type == VBI_EVENT_CAPTION) {
                 hv_store_iv(hv, pgno, ev->ev.ttx_page.pgno);
 
-#ifdef VBI_EVENT_NETWORK_ID
-        } else if ( (ev->type == VBI_EVENT_NETWORK) ||
-                    (ev->type == VBI_EVENT_NETWORK_ID) ) {
+        } else if ( (ev->type == VBI_EVENT_NETWORK)
+#if LIBZVBI_H_VERSION(0,2,20)
+                    || (ev->type == VBI_EVENT_NETWORK_ID)
+#endif
+                  ) {
                 hv_store_iv(hv, nuid, ev->ev.network.nuid);
                 if (ev->ev.network.name[0] != 0) {
                         hv_store_pv(hv, name, ev->ev.network.name);
@@ -575,7 +660,7 @@ zvbi_xs_event_to_hv( HV * hv, vbi_event * ev )
                 hv_store_iv(hv, cni_8301, ev->ev.network.cni_8301);
                 hv_store_iv(hv, cni_8302, ev->ev.network.cni_8302);
                 hv_store_iv(hv, cycle, ev->ev.network.cycle);
-#endif
+
         } else if (ev->type == VBI_EVENT_TRIGGER) {
                 zvbi_xs_page_link_to_hv(hv, ev->ev.trigger);
         } else if (ev->type == VBI_EVENT_ASPECT) {
@@ -685,6 +770,7 @@ zvbi_xs_export_option_info_to_hv( vbi_option_info * p_opt )
         return hv;
 }
 
+#if LIBZVBI_H_VERSION(0,2,9)
 /*
  * Invoke callback for an event generated by the proxy client
  */
@@ -714,6 +800,7 @@ zvbi_xs_proxy_callback( void * user_data, VBI_PROXY_EV_TYPE ev_mask )
                 LEAVE ;
         }
 }
+#endif /* LIBZVBI_H_VERSION(0,2,9) */
 
 /*
  * Invoke callback for an event generated by the VT decoder
@@ -874,6 +961,51 @@ static int (* const zvbi_xs_search_cb_list[ZVBI_MAX_CB_COUNT])( vbi_page * pg ) 
 #error "Search progress callback function list length mismatch"
 #endif
 
+#if LIBZVBI_H_VERSION(0,2,26)
+/*
+ * Invoke callback in DVB PES and TS multiplexer to process generated
+ * packets. Callback can return FALSE to discard remaining data.
+ */
+vbi_bool
+zvbi_xs_dvb_mux_handler( vbi_dvb_mux *          mx,
+                         void *                 user_data,
+                         const uint8_t *        packet,
+                         unsigned int           packet_size )
+{
+        VbiDvb_MuxObj * ctx = user_data;
+        I32  count;
+        vbi_bool result = FALSE; /* defaults to "failure" result */
+
+        if ((ctx != NULL) && (ctx->mux_cb != NULL)) {
+                dSP ;
+                ENTER ;
+                SAVETMPS ;
+
+                /* push the function parameters on the Perl interpreter stack */
+                PUSHMARK(SP) ;
+                XPUSHs(sv_2mortal (newSVpvn ((char*)packet, packet_size)));
+                if (ctx->mux_user_data != NULL) {
+                        XPUSHs(ctx->mux_user_data);
+                }
+                PUTBACK ;
+
+                /* invoke the Perl subroutine */
+                count = call_sv(ctx->mux_cb, G_SCALAR) ;
+
+                SPAGAIN ;
+
+                if (count == 1) {
+                        result = !! POPi;
+                }
+
+                FREETMPS ;
+                LEAVE ;
+        }
+        return result;
+}
+#endif /* LIBZVBI_H_VERSION(0,2,26) */
+
+#if LIBZVBI_H_VERSION(0,2,10)
 /*
  * Invoke callback in DVB PES de-multiplexer to process sliced data.
  * Callback can return FALSE to abort decoding of the current buffer
@@ -928,8 +1060,9 @@ zvbi_xs_dvb_pes_handler( vbi_dvb_demux *        dx,
         }
         return result;
 }
+#endif /* LIBZVBI_H_VERSION(0,2,10) */
 
-#if LIBZVBI_VERSION(0,2,22)
+#if LIBZVBI_H_VERSION(0,2,22)
 void
 zvbi_xs_dvb_log_handler( vbi_log_mask           level,
                          const char *           context,
@@ -968,7 +1101,7 @@ zvbi_xs_dvb_log_handler( vbi_log_mask           level,
 /*
  * Invoke callback for log messages.
  */
-#if LIBZVBI_VERSION(0,2,22)
+#if LIBZVBI_H_VERSION(0,2,22)
 static void
 zvbi_xs_log_callback( vbi_log_mask           level,
                       const char *           context,
@@ -1005,6 +1138,7 @@ zvbi_xs_log_callback( vbi_log_mask           level,
 }
 #endif
 
+#if LIBZVBI_H_VERSION(0,2,14)
 vbi_bool
 zvbi_xs_demux_idl_handler( vbi_idl_demux *        dx,
                            const uint8_t *        buffer,
@@ -1080,7 +1214,9 @@ zvbi_xs_demux_pfc_handler( vbi_pfc_demux *        dx,
         }
         return result;
 }
+#endif /* LIBZVBI_H_VERSION(0,2,14) */
 
+#if LIBZVBI_H_VERSION(0,2,16)
 vbi_bool
 zvbi_xs_demux_xds_handler( vbi_xds_demux *        xd,
                            const vbi_xds_packet * xp,
@@ -1117,6 +1253,7 @@ zvbi_xs_demux_xds_handler( vbi_xds_demux *        xd,
         }
         return result;
 }
+#endif /* LIBZVBI_H_VERSION(0,2,16) */
 
 /*
  * Get slicer buffer from a blessed vbi_capture_buffer struct or a plain scalar
@@ -1147,7 +1284,7 @@ zvbi_xs_sv_to_sliced( SV * sv_sliced, unsigned int * max_lines )
 }
 
 /*
- * Grow the given scalar to exactly the requested size for use as data buffer
+ * Grow the given scalar to exactly the requested size for use as an output buffer
  */
 static void *
 zvbi_xs_sv_buffer_prep( SV * sv_buf, STRLEN buf_size )
@@ -1290,7 +1427,7 @@ static SV *
 zvbi_xs_convert_pal8_to_xpm( VbiPageObj * pg_obj, const uint8_t * p_img,
                              int pix_width, int pix_height, int scale )
 {
-#if LIBZVBI_VERSION(0,2,26)
+#if LIBZVBI_H_VERSION(0,2,26)
         int idx;
         int row;
         int col;
@@ -1368,6 +1505,8 @@ PROTOTYPES: ENABLE
  # ---------------------------------------------------------------------------
  #  VBI Proxy Client
  # ---------------------------------------------------------------------------
+
+#if LIBZVBI_H_VERSION(0,2,9)
 
 VbiProxyObj *
 vbi_proxy_client_create(dev_name, p_client_name, client_flags, errorstr, trace_level)
@@ -1511,6 +1650,7 @@ vbi_proxy_client_has_channel_control(vpc)
         CODE:
         RETVAL = vbi_proxy_client_has_channel_control(vpc->ctx);
 
+#endif
 
  # ---------------------------------------------------------------------------
  #  VBI Capturing & Slicing
@@ -1587,6 +1727,8 @@ vbi_capture_dvb_filter(cap, pid)
         VbiCaptureObj * cap
         int pid
 
+#if LIBZVBI_H_VERSION(0,2,13)
+
 VbiCaptureObj *
 vbi_capture_dvb_new(dev, scanning, services, strict, errorstr, trace)
         char *dev
@@ -1618,6 +1760,9 @@ vbi_capture_dvb_new2(device_name, pid, errorstr, trace)
         errorstr
         RETVAL
 
+#endif
+#if LIBZVBI_H_VERSION(0,2,9)
+
 VbiCaptureObj *
 vbi_capture_proxy_new(vpc, buffers, scanning, srv, strict, errorstr)
         VbiProxyObj * vpc
@@ -1633,6 +1778,8 @@ vbi_capture_proxy_new(vpc, buffers, scanning, srv, strict, errorstr)
         srv
         errorstr
         RETVAL
+
+#endif
 
 void
 vbi_capture_DESTROY(cap)
@@ -1848,9 +1995,13 @@ vbi_capture_set_video_path(capture, p_dev_video)
         VbiCaptureObj * capture
         const char * p_dev_video
 
+#if LIBZVBI_H_VERSION(0,2,9)
+
 VBI_CAPTURE_FD_FLAGS
 vbi_capture_get_fd_flags(capture)
         VbiCaptureObj * capture
+
+#endif
 
 MODULE = Video::ZVBI	PACKAGE = Video::ZVBI
 
@@ -2012,10 +2163,348 @@ decode(rd, sv_raw, sv_sliced)
         RETVAL
 
  # ---------------------------------------------------------------------------
- #  DVB demux
+ #  DVB multiplexer
+ # ---------------------------------------------------------------------------
+
+MODULE = Video::ZVBI	PACKAGE = Video::ZVBI::dvb_mux	PREFIX = vbi_dvb_mux_
+
+#if LIBZVBI_H_VERSION(0,2,26)
+
+VbiDvb_MuxObj *
+pes_new(callback=NULL, user_data=NULL)
+        CV *            callback
+        SV *            user_data
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_pes_mux_new);
+        Newz(0, RETVAL, 1, VbiDvb_MuxObj);
+        if (callback != NULL) {
+                RETVAL->ctx = zvbi_(dvb_pes_mux_new)(zvbi_xs_dvb_mux_handler, RETVAL);
+                if (RETVAL->ctx != NULL) {
+                        RETVAL->mux_cb = SvREFCNT_inc(callback);
+                        RETVAL->mux_user_data = SvREFCNT_inc(user_data);
+                }
+        } else {
+                RETVAL->ctx = zvbi_(dvb_pes_mux_new)(NULL, NULL);
+        }
+        if (RETVAL->ctx == NULL) {
+                Safefree(RETVAL);
+                RETVAL = NULL;
+        }
+        OUTPUT:
+        RETVAL
+
+VbiDvb_MuxObj *
+ts_new(pid, callback=NULL, user_data=NULL)
+        unsigned int    pid
+        CV *            callback
+        SV *            user_data
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_ts_mux_new);
+        Newz(0, RETVAL, 1, VbiDvb_MuxObj);
+        if (callback != NULL) {
+                RETVAL->ctx = zvbi_(dvb_ts_mux_new)(pid, zvbi_xs_dvb_mux_handler, RETVAL);
+                if (RETVAL->ctx != NULL) {
+                        RETVAL->mux_cb = SvREFCNT_inc(callback);
+                        RETVAL->mux_user_data = SvREFCNT_inc(user_data);
+                }
+        } else {
+                RETVAL->ctx = zvbi_(dvb_ts_mux_new)(pid, NULL, NULL);
+        }
+        if (RETVAL->ctx == NULL) {
+                Safefree(RETVAL);
+                RETVAL = NULL;
+        }
+        OUTPUT:
+        RETVAL
+
+void
+DESTROY(mx)
+        VbiDvb_MuxObj * mx
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_delete);
+        zvbi_(dvb_mux_delete)(mx->ctx);
+        Save_SvREFCNT_dec(mx->mux_cb);
+        Save_SvREFCNT_dec(mx->mux_user_data);
+        Safefree(mx);
+
+void
+vbi_dvb_mux_reset(mx)
+        VbiDvb_MuxObj * mx
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_reset);
+        zvbi_(dvb_mux_reset)(mx->ctx);
+
+vbi_bool
+vbi_dvb_mux_cor(mx, sv_buf, buffer_left, sv_sliced, sliced_left, service_mask, pts, sv_raw=NULL, hv_raw_par=NULL)
+        VbiDvb_MuxObj *         mx
+        SV *                    sv_buf
+        unsigned int            &buffer_left
+        SV  *                   sv_sliced
+        unsigned int            &sliced_left
+        vbi_service_set         service_mask
+        int64_t                 pts
+        SV  *                   sv_raw
+        HV  *                   hv_raw_par
+        PREINIT:
+        uint8_t *               p_buf;
+        STRLEN                  buf_size;
+        const vbi_sliced *      p_sliced;
+        unsigned int            max_lines;
+        const uint8_t *         p_raw = NULL;
+        STRLEN                  raw_size;
+        vbi_raw_decoder         rd;
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_cor);
+        if (sv_raw != NULL) {
+                memset(&rd, 0, sizeof(rd));
+                if (hv_raw_par != NULL) {
+                        zvbi_xs_hv_to_dec_params(hv_raw_par, &rd);
+                } else {
+                        croak("Sampling parameters must be present when a raw buffer is passed");
+                }
+                if (SvOK(sv_raw)) {
+                        p_raw = (void *) SvPV(sv_raw, raw_size);
+                        if (raw_size < (rd.count[0] + rd.count[1]) * rd.bytes_per_line) {
+                                croak("Input raw buffer is smaller than required for "
+                                      "VBI geometry (%d+%d lines with %d bytes)",
+                                      rd.count[0], rd.count[1], rd.bytes_per_line);
+                                p_raw = NULL;
+                        }
+                } else {
+                        croak("Raw buffer is undefined or not a scalar");
+                }
+        }
+        if (SvPOK(sv_buf)) {
+                p_buf = (void *) SvPV(sv_buf, buf_size);
+        } else {
+                p_buf = zvbi_xs_sv_buffer_prep(sv_buf, buffer_left);
+                buf_size = buffer_left;
+        }
+        if (buffer_left <= buf_size) {
+                p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
+                if ((p_sliced != NULL) && (sliced_left <= max_lines)) {
+                        p_buf += buf_size - buffer_left;
+                        p_sliced += max_lines - sliced_left;
+
+                        RETVAL =
+                          zvbi_(dvb_mux_cor)(mx->ctx,
+                                             &p_buf, &buffer_left,
+                                             &p_sliced, &sliced_left,
+                                             service_mask,
+                                             p_raw, ((p_raw != NULL) ? &rd : NULL),
+                                             pts);
+                } else if (p_sliced != NULL) {
+                        croak("Invalid sliced left count %d for buffer size (max. %d lines)", sliced_left, max_lines);
+                }
+        } else {
+                croak("Output buffer size %d is less than left count %d", buf_size, buffer_left);
+        }
+        OUTPUT:
+        buffer_left
+        sliced_left
+        RETVAL
+
+vbi_bool
+vbi_dvb_mux_feed(mx, sv_sliced, sliced_lines, service_mask, pts, sv_raw=NULL, hv_raw_par=NULL)
+        VbiDvb_MuxObj *         mx
+        SV  *                   sv_sliced
+        unsigned int            sliced_lines
+        vbi_service_set         service_mask
+        int64_t                 pts
+        SV  *                   sv_raw
+        HV  *                   hv_raw_par
+        PREINIT:
+        const vbi_sliced *      p_sliced;
+        unsigned int            max_lines;
+        const uint8_t *         p_raw = NULL;
+        STRLEN                  raw_size;
+        vbi_raw_decoder         rd;
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_feed);
+        if (mx->mux_cb == NULL) {
+                croak("Use of the feed method is not possible in dvb_mux contexts without handler function");
+        }
+        if (sv_raw != NULL) {
+                memset(&rd, 0, sizeof(rd));
+                if (hv_raw_par != NULL) {
+                        zvbi_xs_hv_to_dec_params(hv_raw_par, &rd);
+                } else {
+                        croak("Sampling parameters must be present when a raw buffer is passed");
+                }
+                if (SvOK(sv_raw)) {
+                        p_raw = (void *) SvPV(sv_raw, raw_size);
+                        if (raw_size < (rd.count[0] + rd.count[1]) * rd.bytes_per_line) {
+                                croak("Input raw buffer is smaller than required for "
+                                      "VBI geometry (%d+%d lines with %d bytes)",
+                                      rd.count[0], rd.count[1], rd.bytes_per_line);
+                                p_raw = NULL;
+                        }
+                } else {
+                        croak("Raw buffer is undefined or not a scalar");
+                }
+        }
+        p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
+        if ((p_sliced != NULL) && (sliced_lines <= max_lines)) {
+                RETVAL =
+                  zvbi_(dvb_mux_feed)(mx->ctx,
+                                      p_sliced + max_lines - sliced_lines, sliced_lines,
+                                      service_mask,
+                                      p_raw, ((p_raw != NULL) ? &rd : NULL),
+                                      pts);
+        } else if (p_sliced != NULL) {
+                croak("Invalid sliced line count %d for buffer size (max. %d lines)", sliced_lines, max_lines);
+        }
+        OUTPUT:
+        RETVAL
+
+unsigned int
+vbi_dvb_mux_get_data_identifier(mx)
+        VbiDvb_MuxObj * mx
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_get_data_identifier);
+        RETVAL = zvbi_(dvb_mux_get_data_identifier)(mx->ctx);
+
+vbi_bool
+vbi_dvb_mux_set_data_identifier(mx, data_identifier)
+        VbiDvb_MuxObj * mx
+        unsigned int    data_identifier
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_set_data_identifier);
+        RETVAL = zvbi_(dvb_mux_set_data_identifier)(mx->ctx, data_identifier);
+
+unsigned int
+vbi_dvb_mux_get_min_pes_packet_size(mx)
+        VbiDvb_MuxObj * mx
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_get_min_pes_packet_size);
+        RETVAL = zvbi_(dvb_mux_get_min_pes_packet_size)(mx->ctx);
+
+unsigned int
+vbi_dvb_mux_get_max_pes_packet_size(mx)
+        VbiDvb_MuxObj * mx
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_get_max_pes_packet_size);
+        RETVAL = zvbi_(dvb_mux_get_max_pes_packet_size)(mx->ctx);
+
+vbi_bool
+vbi_dvb_mux_set_pes_packet_size(mx, min_size, max_size)
+        VbiDvb_MuxObj * mx
+        unsigned int    min_size
+        unsigned int    max_size
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_set_pes_packet_size);
+        RETVAL = zvbi_(dvb_mux_set_pes_packet_size)(mx->ctx, min_size, max_size);
+
+MODULE = Video::ZVBI	PACKAGE = Video::ZVBI
+
+vbi_bool
+dvb_multiplex_sliced(sv_buf, buffer_left, sv_sliced, sliced_left, service_mask, data_identifier, stuffing)
+        SV *                    sv_buf
+        unsigned int            &buffer_left
+        SV *                    sv_sliced
+        unsigned int            &sliced_left
+        vbi_service_set         service_mask
+        unsigned int            data_identifier
+        vbi_bool                stuffing
+        PREINIT:
+        uint8_t *               p_buf;
+        STRLEN                  buf_size;
+        const vbi_sliced *      p_sliced;
+        unsigned int            max_lines;
+        vbi_raw_decoder         rd;
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_multiplex_sliced);
+        if (SvPOK(sv_buf)) {
+                p_buf = (void *) SvPV(sv_buf, buf_size);
+        } else {
+                p_buf = zvbi_xs_sv_buffer_prep(sv_buf, buffer_left);
+                buf_size = buffer_left;
+        }
+        p_buf = (void *) SvPV(sv_buf, buf_size);
+        if (buffer_left <= buf_size) {
+                p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
+                if ((p_sliced != NULL) && (sliced_left <= max_lines)) {
+                        p_buf += buf_size - buffer_left;
+                        p_sliced += max_lines - sliced_left;
+
+                        RETVAL =
+                          zvbi_(dvb_multiplex_sliced) ( &p_buf, &buffer_left,
+                                                        &p_sliced, &sliced_left,
+                                                        service_mask, data_identifier,
+                                                        stuffing );
+                } else if (p_sliced != NULL) {
+                        croak("Invalid sliced left count %d for buffer size (max. %d lines)", sliced_left, max_lines);
+                }
+        } else {
+                croak("Output buffer size %d is less than left count %d", buf_size, buffer_left);
+        }
+        OUTPUT:
+        buffer_left
+        sliced_left
+        RETVAL
+
+vbi_bool
+dvb_multiplex_raw(sv_buf, buffer_left, sv_raw, raw_left, data_identifier, videostd_set, line, first_pixel_position, n_pixels_total, stuffing)
+        SV *                    sv_buf
+        unsigned int            &buffer_left
+        SV *                    sv_raw
+        unsigned int            &raw_left
+        unsigned int            data_identifier
+        vbi_videostd_set        videostd_set
+        unsigned int            line
+        unsigned int            first_pixel_position
+        unsigned int            n_pixels_total
+        vbi_bool                stuffing
+        PREINIT:
+        uint8_t *               p_buf;
+        STRLEN                  buf_size;
+        const uint8_t *         p_raw;
+        STRLEN                  raw_size;
+        CODE:
+        CHECK_LIBZVBI_SYM(0,2,26, dvb_multiplex_raw);
+        if (SvPOK(sv_buf)) {
+                p_buf = (void *) SvPV(sv_buf, buf_size);
+        } else {
+                p_buf = zvbi_xs_sv_buffer_prep(sv_buf, buffer_left);
+                buf_size = buffer_left;
+        }
+        p_buf = (void *) SvPV(sv_buf, buf_size);
+        if (buffer_left <= buf_size) {
+                if (SvOK(sv_raw)) {
+                        p_raw = (void *) SvPV(sv_raw, raw_size);
+                        if (raw_left <= raw_size) {
+                                p_buf += buf_size - buffer_left;
+                                p_raw += raw_size - raw_left;
+
+                                RETVAL =
+                                  zvbi_(dvb_multiplex_raw) ( &p_buf, &buffer_left,
+                                                             &p_raw, &raw_left,
+                                                             data_identifier, videostd_set,
+                                                             line, first_pixel_position,
+                                                             n_pixels_total, stuffing);
+                        } else {
+                                croak("Output buffer size %d is less than left count %d", buf_size, buffer_left);
+                        }
+                } else {
+                        croak("Raw input buffer is undefined or not a scalar");
+                }
+        } else {
+                croak("Output buffer size %d is less than left count %d", buf_size, buffer_left);
+        }
+        OUTPUT:
+        buffer_left
+        raw_left
+        RETVAL
+
+#endif
+
+ # ---------------------------------------------------------------------------
+ #  DVB demultiplexer
  # ---------------------------------------------------------------------------
 
 MODULE = Video::ZVBI	PACKAGE = Video::ZVBI::dvb_demux	PREFIX = vbi_dvb_demux_
+
+#if LIBZVBI_H_VERSION(0,2,10)
 
 VbiDvb_DemuxObj *
 pes_new(callback=NULL, user_data=NULL)
@@ -2071,7 +2560,7 @@ vbi_dvb_demux_cor(dx, sv_sliced, sliced_lines, pts, sv_buf, buf_left)
         size_t size_sliced;
         CODE:
         if (dx->demux_cb != NULL) {
-                croak("Use of the cor method is not supported in demux contexts with handler function");
+                croak("Use of the cor method is not supported in dvb_demux contexts with handler function");
 
         } else if (SvOK(sv_buf)) {
                 p_buf = (void *) SvPV(sv_buf, buf_size);
@@ -2106,7 +2595,7 @@ vbi_dvb_demux_feed(dx, sv_buf)
         uint8_t * p_buf;
         CODE:
         if (dx->demux_cb == NULL) {
-                croak("Use of the feed method is not possible in demux contexts without handler function");
+                croak("Use of the feed method is not possible in dvb_demux contexts without handler function");
 
         } else if (SvOK(sv_buf)) {
                 p_buf = (uint8_t *) SvPV(sv_buf, buf_size);
@@ -2125,8 +2614,8 @@ vbi_dvb_demux_set_log_fn(dx, mask, log_fn=NULL, user_data=NULL)
         CV *                    log_fn
         SV *                    user_data
         CODE:
+#if LIBZVBI_H_VERSION(0,2,22)
         CHECK_LIBZVBI_SYM(0,2,22, dvb_demux_set_log_fn);
-#if LIBZVBI_VERSION(0,2,22)
         Save_SvREFCNT_dec(dx->log_cb);
         Save_SvREFCNT_dec(dx->log_user_data);
         if (log_fn != NULL) {
@@ -2138,6 +2627,10 @@ vbi_dvb_demux_set_log_fn(dx, mask, log_fn=NULL, user_data=NULL)
                 dx->log_user_data = NULL;
                 zvbi_(dvb_demux_set_log_fn)(dx->ctx, mask, NULL, NULL);
         }
+#else
+        CROAK_LIB_VERSION(0,2,22, dvb_demux_set_log_fn);
+#endif
+
 #endif
 
  # ---------------------------------------------------------------------------
@@ -2145,6 +2638,8 @@ vbi_dvb_demux_set_log_fn(dx, mask, log_fn=NULL, user_data=NULL)
  # ---------------------------------------------------------------------------
 
 MODULE = Video::ZVBI	PACKAGE = Video::ZVBI::idl_demux	PREFIX = vbi_idl_demux_
+
+#if LIBZVBI_H_VERSION(0,2,14)
 
 VbiIdl_DemuxObj *
 new(channel, address, callback=NULL, user_data=NULL)
@@ -2218,8 +2713,8 @@ vbi_idl_demux_feed_frame(dx, sv_sliced, n_lines)
         vbi_sliced * p_sliced;
         unsigned int max_lines;
         CODE:
+#if LIBZVBI_H_VERSION(0,2,26)
         CHECK_LIBZVBI_SYM(0,2,26, idl_demux_feed_frame);
-#if LIBZVBI_VERSION(0,2,26)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
@@ -2228,15 +2723,21 @@ vbi_idl_demux_feed_frame(dx, sv_sliced, n_lines)
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
                 }
         }
+#else
+        CROAK_LIB_VERSION(0,2,26, idl_demux_feed_frame);
 #endif
         OUTPUT:
         RETVAL
+
+#endif
 
  # ---------------------------------------------------------------------------
  # PFC (Page Format Clear Demultiplexer ETS 300 708)
  # ---------------------------------------------------------------------------
 
 MODULE = Video::ZVBI	PACKAGE = Video::ZVBI::pfc_demux	PREFIX = vbi_pfc_demux_
+
+#if LIBZVBI_H_VERSION(0,2,14)
 
 VbiPfc_DemuxObj *
 vbi_pfc_demux_new(pgno, stream, callback=NULL, user_data=NULL)
@@ -2312,8 +2813,8 @@ vbi_pfc_demux_feed_frame(dx, sv_sliced, n_lines)
         vbi_sliced * p_sliced;
         unsigned int max_lines;
         CODE:
+#if LIBZVBI_H_VERSION(0,2,26)
         CHECK_LIBZVBI_SYM(0,2,26, pfc_demux_feed_frame);
-#if LIBZVBI_VERSION(0,2,26)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
@@ -2322,15 +2823,21 @@ vbi_pfc_demux_feed_frame(dx, sv_sliced, n_lines)
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
                 }
         }
+#else
+        CROAK_LIB_VERSION(0,2,26, pfc_demux_feed_frame);
 #endif
         OUTPUT:
         RETVAL
+
+#endif
 
  # ---------------------------------------------------------------------------
  # XDS Demux
  # ---------------------------------------------------------------------------
 
 MODULE = Video::ZVBI	PACKAGE = Video::ZVBI::xds_demux	PREFIX = vbi_xds_demux_
+
+#if LIBZVBI_H_VERSION(0,2,16)
 
 VbiXds_DemuxObj *
 vbi_xds_demux_new(callback=NULL, user_data=NULL)
@@ -2402,8 +2909,8 @@ vbi_xds_demux_feed_frame(xd, sv_sliced, n_lines)
         vbi_sliced * p_sliced;
         unsigned int max_lines;
         CODE:
+#if LIBZVBI_H_VERSION(0,2,26)
         CHECK_LIBZVBI_SYM(0,2,26, xds_demux_feed_frame);
-#if LIBZVBI_VERSION(0,2,26)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
@@ -2412,9 +2919,13 @@ vbi_xds_demux_feed_frame(xd, sv_sliced, n_lines)
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
                 }
         }
+#else
+        CROAK_LIB_VERSION(0,2,26, xds_demux_feed_frame);
 #endif
         OUTPUT:
         RETVAL
+
+#endif
 
  # ---------------------------------------------------------------------------
  #  Teletext Page De-Multiplexing & Caching
@@ -2942,7 +3453,7 @@ print_page(pg_obj, table=0, rtl=0)
         vbi_bool table
         vbi_bool rtl
         PREINIT:
-        const int max_size = 40 * 25 * 4;
+        const int max_size = (40 + 1) * 25 * 4;
         int size;
         char * p_buf;
         CODE:
@@ -3291,14 +3802,16 @@ vbi_export_mem(exp, sv_buf, pg_obj)
         char * p_buf;
         STRLEN buf_size;
         CODE:
+#if LIBZVBI_H_VERSION(0,2,26)
         CHECK_LIBZVBI_SYM(0,2,26, export_mem);
-#if LIBZVBI_VERSION(0,2,26)
         if (SvOK(sv_buf))  {
                 p_buf = SvPV_force(sv_buf, buf_size);
                 RETVAL = zvbi_(export_mem)(exp, p_buf, buf_size + 1, pg_obj->p_pg);
         } else {
                 croak("Input buffer is undefined or not a scalar");
         }
+#else
+        CROAK_LIB_VERSION(0,2,26, export_mem);
 #endif
         OUTPUT:
         sv_buf
@@ -3313,8 +3826,8 @@ vbi_export_alloc(exp, pg_obj)
         size_t buf_size;
         SV * sv;
         PPCODE:
+#if LIBZVBI_H_VERSION(0,2,26)
         CHECK_LIBZVBI_SYM(0,2,26, export_alloc);
-#if LIBZVBI_VERSION(0,2,26)
         if (zvbi_(export_alloc)(exp, (void**)&p_buf, &buf_size, pg_obj->p_pg)) {
                 sv = newSV(0);
                 sv_usepvn(sv, p_buf, buf_size);
@@ -3322,6 +3835,8 @@ vbi_export_alloc(exp, pg_obj)
                 EXTEND(sp, 1);
                 PUSHs (sv_2mortal (sv));
         }
+#else
+        CROAK_LIB_VERSION(0,2,26, export_alloc);
 #endif
 
 char *
@@ -3586,8 +4101,8 @@ set_log_fn(mask, log_fn=NULL, user_data=NULL)
         dMY_CXT;
         unsigned cb_idx;
         CODE:
+#if LIBZVBI_H_VERSION(0,2,22)
         CHECK_LIBZVBI_SYM(0,2,22, set_log_fn);
-#if LIBZVBI_VERSION(0,2,22)
         zvbi_xs_free_callback_by_obj(MY_CXT.log, NULL);
         if (log_fn != NULL) {
                 cb_idx = zvbi_xs_alloc_callback(MY_CXT.log, (SV*)log_fn, user_data, NULL);
@@ -3600,6 +4115,8 @@ set_log_fn(mask, log_fn=NULL, user_data=NULL)
         } else {
                 zvbi_(set_log_fn)(mask, NULL, NULL);
         }
+#else
+        CROAK_LIB_VERSION(0,2,22, set_log_fn);
 #endif
 
 void
@@ -3608,10 +4125,12 @@ set_log_on_stderr(mask)
         PREINIT:
         dMY_CXT;
         CODE:
+#if LIBZVBI_H_VERSION(0,2,22)
         CHECK_LIBZVBI_SYM(0,2,22, log_on_stderr);
-#if LIBZVBI_VERSION(0,2,22)
         zvbi_xs_free_callback_by_obj(MY_CXT.log, NULL);
         zvbi_(set_log_fn)(mask, zvbi_(log_on_stderr), NULL);
+#else
+        CROAK_LIB_VERSION(0,2,22, log_on_stderr);
 #endif
 
 void
@@ -3622,8 +4141,8 @@ decode_vps_cni(data)
         unsigned char *p;
         STRLEN len;
         PPCODE:
+#if LIBZVBI_H_VERSION(0,2,20)
         CHECK_LIBZVBI_SYM(0,2,20, decode_vps_cni);
-#if LIBZVBI_VERSION(0,2,20)
         p = (unsigned char *)SvPV (data, len);
         if (len >= 13) {
                 if (zvbi_(decode_vps_cni)(&cni, p)) {
@@ -3633,6 +4152,8 @@ decode_vps_cni(data)
         } else {
                 croak ("decode_vps_cni: input buffer must have at least 13 bytes");
         }
+#else
+        CROAK_LIB_VERSION(0,2,20, decode_vps_cni);
 #endif
 
 void
@@ -3641,12 +4162,14 @@ encode_vps_cni(cni)
         PREINIT:
         uint8_t buffer[13];
         PPCODE:
+#if LIBZVBI_H_VERSION(0,2,20)
         CHECK_LIBZVBI_SYM(0,2,20, encode_vps_cni);
-#if LIBZVBI_VERSION(0,2,20)
         if (zvbi_(encode_vps_cni)(buffer, cni)) {
                 EXTEND(sp,1);
                 PUSHs (sv_2mortal (newSVpvn ((char*)buffer, 13)));
         }
+#else
+        CROAK_LIB_VERSION(0,2,20, encode_vps_cni);
 #endif
 
 void
@@ -3683,8 +4206,8 @@ iconv_caption(sv_src, repl_char=0)
         STRLEN src_len;
         SV * sv;
         PPCODE:
+#if LIBZVBI_H_VERSION(0,2,23)
         CHECK_LIBZVBI_SYM(0,2,23, strndup_iconv_caption);
-#if LIBZVBI_VERSION(0,2,23)
         p_src = (void *) SvPV(sv_src, src_len);
         p_buf = zvbi_(strndup_iconv_caption)("UTF-8", p_src, src_len, '?');
         if (p_buf != NULL) {
@@ -3695,6 +4218,8 @@ iconv_caption(sv_src, repl_char=0)
                 EXTEND(sp, 1);
                 PUSHs (sv_2mortal (sv));
         }
+#else
+        CROAK_LIB_VERSION(0,2,23, strndup_iconv_caption);
 #endif
 
 void
@@ -3707,8 +4232,8 @@ caption_unicode(c, to_upper=0)
         U8 * p;
         SV * sv;
         PPCODE:
+#if LIBZVBI_H_VERSION(0,2,23)
         CHECK_LIBZVBI_SYM(0,2,23, caption_unicode);
-#if LIBZVBI_VERSION(0,2,23)
         ucs = zvbi_(caption_unicode)(c, to_upper);
         if (ucs != 0) {
                 p = uvuni_to_utf8(buf, ucs);
@@ -3719,6 +4244,8 @@ caption_unicode(c, to_upper=0)
         }
         EXTEND(sp, 1);
         PUSHs (sv);
+#else
+        CROAK_LIB_VERSION(0,2,23, caption_unicode);
 #endif
 
 BOOT:
@@ -3743,17 +4270,10 @@ BOOT:
 
         /* capture interface */
         EXPORT_XS_CONST( VBI_SLICED_NONE );
-        EXPORT_XS_CONST( VBI_SLICED_UNKNOWN );
-        EXPORT_XS_CONST( VBI_SLICED_ANTIOPE );
-        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_A );
         EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_L10_625 );
         EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_L25_625 );
         EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B );
-        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_625 );
-        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_C_625 );
-        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_D_625 );
         EXPORT_XS_CONST( VBI_SLICED_VPS );
-        EXPORT_XS_CONST( VBI_SLICED_VPS_F2 );
         EXPORT_XS_CONST( VBI_SLICED_CAPTION_625_F1 );
         EXPORT_XS_CONST( VBI_SLICED_CAPTION_625_F2 );
         EXPORT_XS_CONST( VBI_SLICED_CAPTION_625 );
@@ -3762,20 +4282,33 @@ BOOT:
         EXPORT_XS_CONST( VBI_SLICED_CAPTION_525_F2 );
         EXPORT_XS_CONST( VBI_SLICED_CAPTION_525 );
         EXPORT_XS_CONST( VBI_SLICED_2xCAPTION_525 );
-        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_525 );
         EXPORT_XS_CONST( VBI_SLICED_NABTS );
-        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_C_525 );
         EXPORT_XS_CONST( VBI_SLICED_TELETEXT_BD_525 );
-        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_D_525 );
         EXPORT_XS_CONST( VBI_SLICED_WSS_CPR1204 );
         EXPORT_XS_CONST( VBI_SLICED_VBI_625 );
         EXPORT_XS_CONST( VBI_SLICED_VBI_525 );
+#if LIBZVBI_H_VERSION(0,2,10)
+        EXPORT_XS_CONST( VBI_SLICED_UNKNOWN );
+        EXPORT_XS_CONST( VBI_SLICED_ANTIOPE );
+        EXPORT_XS_CONST( VBI_SLICED_VPS_F2 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_A );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_625 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_C_625 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_D_625 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_B_525 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_C_525 );
+        EXPORT_XS_CONST( VBI_SLICED_TELETEXT_D_525 );
+#endif
 
+        /* VBI_CAPTURE_FD_FLAGS */
+#if LIBZVBI_H_VERSION(0,2,9)
         EXPORT_XS_CONST( VBI_FD_HAS_SELECT );
         EXPORT_XS_CONST( VBI_FD_HAS_MMAP );
         EXPORT_XS_CONST( VBI_FD_IS_DEVICE );
+#endif
 
         /* proxy interface */
+#if LIBZVBI_H_VERSION(0,2,9)
         EXPORT_XS_CONST( VBI_PROXY_CLIENT_NO_TIMEOUTS );
         EXPORT_XS_CONST( VBI_PROXY_CLIENT_NO_STATUS_IND );
 
@@ -3807,10 +4340,13 @@ BOOT:
         EXPORT_XS_CONST( VBI_PROXY_EV_NORM_CHANGED );
         EXPORT_XS_CONST( VBI_PROXY_EV_CHN_RECLAIMED );
         EXPORT_XS_CONST( VBI_PROXY_EV_NONE );
+#endif
 
         /* demux */
+#if LIBZVBI_H_VERSION(0,2,14)
         EXPORT_XS_CONST( VBI_IDL_DATA_LOST );
         EXPORT_XS_CONST( VBI_IDL_DEPENDENT );
+#endif
 
         /* vt object */
         EXPORT_XS_CONST( VBI_EVENT_NONE );
@@ -3821,7 +4357,7 @@ BOOT:
         EXPORT_XS_CONST( VBI_EVENT_TRIGGER );
         EXPORT_XS_CONST( VBI_EVENT_ASPECT );
         EXPORT_XS_CONST( VBI_EVENT_PROG_INFO );
-#ifdef VBI_EVENT_NETWORK_ID
+#if LIBZVBI_H_VERSION(0,2,20)
         EXPORT_XS_CONST( VBI_EVENT_NETWORK_ID );
 #endif
 
@@ -3899,7 +4435,7 @@ BOOT:
         /* export */
         EXPORT_XS_CONST( VBI_PIXFMT_RGBA32_LE );
         EXPORT_XS_CONST( VBI_PIXFMT_YUV420 );
-#if LIBZVBI_VERSION(0,2,26)
+#if LIBZVBI_H_VERSION(0,2,26)
         EXPORT_XS_CONST( VBI_PIXFMT_PAL8 );
 #endif
 
@@ -3910,7 +4446,7 @@ BOOT:
         EXPORT_XS_CONST( VBI_OPTION_MENU );
 
         /* logging */
-#if LIBZVBI_VERSION(0,2,22)
+#if LIBZVBI_H_VERSION(0,2,22)
         EXPORT_XS_CONST( VBI_LOG_ERROR );
         EXPORT_XS_CONST( VBI_LOG_WARNING );
         EXPORT_XS_CONST( VBI_LOG_NOTICE );

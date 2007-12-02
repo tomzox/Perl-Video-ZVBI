@@ -19,7 +19,7 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-# $Id: browse-ttx.pl,v 1.1 2007/11/18 18:48:35 tom Exp tom $
+# $Id: browse-ttx.pl,v 1.2 2007/12/02 18:30:50 tom Exp tom $
 
 use strict;
 use blib;
@@ -127,25 +127,32 @@ sub pg_display_xpm {
    my $pg = $vtdec->fetch_vt_page($pg_sched, 0, VBI_WST_LEVEL_3p5, 25, 1);
    if (defined $pg) {
       my ($h, $w) = $pg->get_page_size();
-      my $fmt;
-      # conversion of 8-bit palette image format into XPM is faster, so prefer that if supported
-      #if (Video::ZVBI::check_lib_version(0,2,26)) {
-      #   $fmt = VBI_PIXFMT_PAL8;
-      #} else {
-      #   $fmt = VBI_PIXFMT_RGBA32_LE;
-      #}
-      #my $img_canvas = $pg->draw_vt_page($fmt);
 
-      #undef $img_xpm;
-      #$img_xpm = $tk->Pixmap(-data, $pg->canvas_to_xpm($img_canvas, $fmt, 1));
+      # export page in XPM format (only supported starting with 0.2.26)
       my $err;
       my $ex = Video::ZVBI::export::new('xpm', $err);
-      $ex->option_set('creator', "") or die;
-      $ex->option_set('titled', 0) or die;
-      $ex->option_set('transparency', 0) or die;
-      my $tmp = $ex->alloc($pg);
+      if (defined $ex) {
+         # suppress all XPM extensions because Pixmap can't handle them
+         $ex->option_set('creator', "") or die;
+         $ex->option_set('titled', 0) or die;
+         $ex->option_set('transparency', 0) or die;
+         my $tmp = $ex->alloc($pg);
+         $img_xpm = $tk->Pixmap(-data, $tmp);
+
+      } else {
+         my $fmt;
+         # conversion of 8-bit palette image format into XPM is faster, so prefer that if supported
+         if (Video::ZVBI::check_lib_version(0,2,26)) {
+            $fmt = VBI_PIXFMT_PAL8;
+         } else {
+            $fmt = VBI_PIXFMT_RGBA32_LE;
+         }
+         my $img_canvas = $pg->draw_vt_page($fmt);
+         undef $img_xpm;
+         $img_xpm = $tk->Pixmap(-data, $pg->canvas_to_xpm($img_canvas, $fmt, 1));
+      }
+
       $canvas->delete('all');
-      my $img_xpm = $tk->Pixmap(-data, $tmp);
       $canvas->createImage(0, 0, -anchor, 'nw', -image, $img_xpm);
       $canvas->configure(-width, $img_xpm->width(), -height, $img_xpm->height());
       $pg_disp = $pg_sched;

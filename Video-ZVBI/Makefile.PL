@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2007 Tom Zoerner. All rights reserved.
+# Copyright (C) 2006-2007 Tom Zoerner.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,10 +13,11 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: Makefile.PL,v 1.2 2007/11/23 22:20:19 tom Exp tom $
+# $Id: Makefile.PL,v 1.3 2007/12/02 19:47:24 tom Exp tom $
 #
 
-use 5.7.1;  # note: keep in sync with ZVBI.pm and Meta.yml
+# oldest supported perl version
+use 5.007_001;  # note: keep in sync with ZVBI.pm and META.yml
 
 use ExtUtils::MakeMaker;
 use ExtUtils::Liblist;
@@ -39,7 +40,13 @@ if (($#ARGV >= 0) && ($ARGV[0] =~ /^LIBPATH=(.*)/)) {
         print STDERR "Probing for prerequisite libzvbi at standard paths...\n";
 }
 my $ll = ExtUtils::Liblist->ext($libs, 1, 1);  # verbose, return names
-die "NA: libzvbi not found - specify 'LIBPATH=/...' on command line\n" unless $#$ll >= 0;
+if ($#$ll < 0) {
+        print STDERR "\nFATAL: Prerequisite zvbi library not found on your system.\n".
+                     "If it's located at a non-standard path, run Makefile.PL\n".
+                     "with 'LIBPATH=/your/path' on the command line (and replace\n".
+                     "'/your/path' with the directory which holds libzvbi.so)\n";
+        exit 0;  # don't die to avoid FAIL reports from CPAN testers
+}
 
 #
 # Compile path and base name of the library (sans minor version) into the
@@ -49,10 +56,11 @@ my $lso = $ll->[0];
 $lso =~ s#\.\d+\.0$##;
 my $def = "-DLIBZVBI_PATH=\\\"$lso\\\"";
 
-# load optional symbols danymically from shared library
+# load optional symbols dynamically from shared library
 $def .= " -DUSE_DL_SYM";
 
 # use packaged header file instead of the one that may or may not be installed
+# should only be enabled together with USE_DL_SYM
 $def .= " -DUSE_LIBZVBI_INT";
 
 #

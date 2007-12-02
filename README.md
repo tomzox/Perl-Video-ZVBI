@@ -84,10 +84,13 @@ be terminated.
 
 ## Installation
 
-Pre-requisite to the installation is the
+Pre-requisite to the installation is a C compiler and the
 [libzvbi library](http://zapping.sourceforge.net/ZVBI/index.html)
-(oldest supported version is 0.2.16) and a C compiler. If you have these
-already, installation is done in the usual steps:
+(oldest supported version is 0.2.16, or 0.2.4 when disabling
+`USE_DL_SYM` in <A HREF="Video-ZVBI/Makefile.PL">Makefile.PL</A>)
+which in turn requires the pthreads and
+PNG libraries. Once you have these, installation is done in the
+usual steps:
 
 ```console
     perl Makefile.PL
@@ -121,7 +124,7 @@ respectively.
 
 ## Copyright
 
-Copyright (C) 2006-2007 Th. "Tom" Zoerner. All rights reserved.
+Copyright (C) 2006-2007 T. Zoerner.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

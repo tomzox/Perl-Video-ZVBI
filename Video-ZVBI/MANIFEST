@@ -2,7 +2,7 @@ COPYING
 ChangeLog
 MANIFEST
 Makefile.PL
-Meta.yml
+META.yml
 README
 test.pl
 typemap

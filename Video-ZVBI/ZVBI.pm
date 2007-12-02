@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2007 Tom Zoerner. All rights reserved.
+# Copyright (C) 2006-2007 Tom Zoerner.
 #
 # Man page descriptions are in part copied from libzvbi documentation:
 #
@@ -17,7 +17,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: ZVBI.pm,v 1.3 2007/11/23 22:20:46 tom Exp tom $
+# $Id: ZVBI.pm,v 1.4 2007/12/02 19:51:52 tom Exp tom $
 #
 
 package Video::ZVBI;
@@ -25,13 +25,13 @@ package Video::ZVBI;
 use strict;
 use warnings;
 
-use 5.7.1;  # uvuni_to_utf8 - note: also in Makefile.PL and Meta.yml
+use 5.007_001;  # uvuni_to_utf8 - note: also in Makefile.PL and META.yml
 
 require Exporter;
 require DynaLoader;
 
 our @ISA = ('Exporter', 'DynaLoader');
-our $VERSION = "0.2.2";  # remember to update README and Meta.yml too
+our $VERSION = "0.2.3";  # remember to update README and META.yml too
 our @EXPORT = qw();
 our @EXPORT_OK = qw();  # filled by XSUB
 
@@ -161,7 +161,7 @@ used to enable output of progress messages on I<stderr>.
 
 Open a new connection to a VBI proxy to open a VBI device for the
 given services.  On side of the proxy daemon, one of the regular
-capture context creation functions (e.g. I<v4l2_new()>) is invoked. 
+capture context creation functions (e.g. I<v4l2_new()>) is invoked.
 If the creation succeeds, and any of the requested services are
 available, capturing is started and all captured data is forwarded
 transparently to the client.
@@ -595,7 +595,7 @@ C<VBI_API_UNKNOWN> upon error.
 The function will fail if the client is currently not connected to
 the proxy daemon, i.e. VBI capture has to be started first.
 
-=item $proxy->channel_request($chn_prio [,$profile])
+=item $proxy->channel_request($chn_prio [, $profile])
 
 This function is used to request permission to switch channels or norm.
 Since the VBI device can be shared with other proxy clients, clients should
@@ -829,6 +829,273 @@ raw decoder contexts for different devices.
 
 =back
 
+=head1 Video::ZVBI::dvb_mux
+
+These functions convert raw and/or sliced VBI data to a DVB Packetized
+Elementary Stream or Transport Stream as defined in EN 300 472 "Digital
+Video Broadcasting (DVB); Specification for conveying ITU-R System B
+Teletext in DVB bitstreams" and EN 301 775 "Digital Video Broadcasting
+(DVB); Specification for the carriage of Vertical Blanking Information
+(VBI) data in DVB bitstreams".
+
+Note EN 300 468 "Digital Video Broadcasting (DVB); Specification for
+Service Information (SI) in DVB systems" defines another method to
+transmit VPS data in DVB streams. Libzvbi does not provide functions
+to generate SI tables but the I<encode_dvb_pdc_descriptor()> function
+is available to convert a VPS PIL to a PDC descriptor (since version 0.3.0)
+
+B<Available:> All of the functions in this sction are available
+only since libzvbi version 0.2.26
+
+=over 4
+
+=item $mx = pes_new( [$callback, $user_data] )
+
+Creates a new DVB VBI multiplexer converting raw and/or sliced VBI data
+to MPEG-2 Packetized Elementary Stream (PES) packets as defined in the
+standards EN 300 472 and EN 301 775.  Returns C<undef> upon error.
+
+Parameter I<$callback> specifies a handler which is called by
+I<$mx-E<gt>feed()> when a new packet is available. must be omitted if
+I<$mx-E<gt>cor()> is used.  The I<$user_data> is passed through to
+the handler.  For further callback parameters see the description
+of the I<feed> function.
+
+=item $mx = ts_new($pid [, $callback, $user_data] )
+
+Allocates a new DVB VBI multiplexer converting raw and/or sliced VBI data
+to MPEG-2 Transport Stream (TS) packets as defined in the standards
+EN 300 472 and EN 301 775. Returns C<undef> upon error.
+
+Parameter I<$pid> is a program ID that will be stored in the header of the
+generated TS packets. The value must be in range 0x0010 to 0x1FFE inclusive.
+
+Parameter I<$callback> specifies a handler which is called by
+I<$mx-E<gt>feed()> when a new packet is available. Must be omitted if
+I<$mx-E<gt>cor()> is used.  The I<$user_data> is passed through to
+the handler.  For further callback parameters see the description
+of the I<feed> function.
+
+=item $mx->mux_reset()
+
+This function clears the internal buffers of the DVB VBI multiplexer.
+
+After a reset call the I<$mx-E<gt>cor()> function will encode a new
+PES packet, discarding any data of the previous packet which has not
+been consumed by the application.
+
+=item $mx->cor($buf, $buffer_left, $sliced, $sliced_left, $service_mask, $pts [, $raw, $sp])
+
+This function converts raw and/or sliced VBI data to one DVB VBI PES
+packet or one or more TS packets as defined in EN 300 472 and
+EN 301 775, and stores them in the output buffer.
+
+If the returned I<$buffer_left> value is zero and the returned
+I<$sliced_left> value is greater than zero another call will be
+necessary to convert the remaining data.
+
+After a I<reset()> call the I<cor()> function will encode a new
+PES packet, discarding any data of the previous packet which has
+not been consumed by the application.
+
+Parameters:
+I<buffer> will be used as output buffer for converted data. This scalar
+may be undefined; else it should have the length given in I<$buffer_left>.
+I<$buffer_left> the number of bytes available in I<$buffer>,
+and will be decremented by number of bytes stored there.
+I<$sliced> contains the sliced VBI data to be converted. All data
+must belong to the same video frame.  I<$sliced> is either a blessed
+reference to a slicer buffer, or a scalar with a byte string consisting
+of sliced data (i.e. the same formats are accepted as by I<$vt-E<gt>decode()>.
+I<$sliced_left> must contain the number of sliced VBI lines in the
+input buffer I<$sliced>. It will be decremented by the number of
+successfully converted structures.  On failure it will point at
+the offending line index (relative to the end of the sliced array.)
+I<$service_mask> Only data services in this set will be
+encoded. Other data services in the sliced input buffer will be
+discarded without further checks. Create a set by ORing
+C<VBI_SLICED_*> constants.
+I<$pts> containts the presentation time stamp which will be encoded
+into the PES packet. Bits 33 ... 63 are discarded.
+
+I<$raw> shall contain a raw VBI frame of (I<$sp-E<gt>{count_a}>
++ I<$sp-E<gt>{count_b}>) lines times I<$sp-E<gt>{bytes_per_line}>.
+The function encodes only those lines which have been selected by sliced
+lines in the I<$sliced> array with id C<VBI_SLICED_VBI_625>
+The data field of these structures is ignored. When the sliced input
+buffer does not contain such structures I<$raw> can be omitted.
+I<$sp> Describes the data in the raw buffer unless raw is omitted.
+Else it must be valid, with the constraints described for I<feed()>
+below.
+
+The function returns 0 on failures, which may occur under the
+following curcumstances:
+* The maximum PES packet size, or the value selected with
+I<$mx-E<gt>set_pes_packet_size()>, is too small to contain all
+the sliced and raw VBI data.
+* The sliced array is not sorted by ascending line number,
+except for elements with line number 0 (undefined).
+* Only the following data services can be encoded:
+(1) C<VBI_SLICED_TELETEXT_B> on lines 7 to 22 and 320 to 335
+inclusive, or with line number 0 (undefined). All Teletext
+lines will be encoded with data_unit_id 0x02 ("EBU Teletext
+non-subtitle data").
+(2) C<VBI_SLICED_VPS> on line 16.
+(3) C<VBI_SLICED_CAPTION_625> on line 22.
+(4) C<VBI_SLICED_WSS_625> on line 23.
+(5) Raw VBI data with id C<VBI_SLICED_VBI_625> can be encoded
+on lines 7 to 23 and 320 to 336 inclusive. Note for compliance
+with the Teletext buffer model defined in EN 300 472,
+EN 301 775 recommends to encode at most one raw and one
+sliced, or two raw VBI lines per frame.
+* A vbi_sliced structure contains a line number outside the
+valid range specified above.
+* parameter I<$raw> is undefined although the sliced array contains
+a structure with id C<VBI_SLICED_VBI_625>.
+* One or more members of the I<$sp> structure are invalid.
+* A vbi_sliced structure with id C<VBI_SLICED_VBI_625>
+contains a line number outside the ranges defined by I<$sp>.
+
+On all errors I<$sliced_left> will refer to the offending sliced
+line in the index buffer (i.e. relative to the end of the buffer)
+and the output buffer remains unchanged.
+
+=item $mx->feed($sliced, $sliced_lines, $service_mask, $pts [, $raw, $sp])
+
+This function converts raw and/or sliced VBI data to one DVB VBI PES
+packet or one or more TS packets as defined in EN 300 472 and
+EN 301 775. To deliver output, the callback function passed to
+I<pes_new()> or I<ts_new()> is called once for each PES or TS packet.
+
+Parameters:
+I<$sliced> contains the sliced VBI data to be converted. All data
+must belong to the same video frame.  I<$sliced> is either a blessed
+reference to a slicer buffer, or a scalar with a byte string consisting
+of sliced data (i.e. the same formats are accepted as by I<$vt-E<gt>decode()>.
+I<$sliced_lines> number of valid lines in the I<$sliced> input buffer.
+I<$service_mask> Only data services in this set will be
+encoded. Other data services in the sliced buffer will be
+discarded without further checks. Create a set by ORing
+C<VBI_SLICED_*> constants.
+I<$pts> This Presentation Time Stamp will be encoded into the
+PES packet. Bits 33 ... 63 are discarded.
+
+I<$raw> shall contain a raw VBI frame of (I<$sp-E<gt>{count_a}>
++ I<$sp-E<gt>{count_b}>) lines times I<$sp-E<gt>{bytes_per_line}>.
+The function encodes only those lines which have been selected by sliced
+lines in the I<$sliced> array with id C<VBI_SLICED_VBI_625>
+The data field of these structures is ignored. When the sliced input
+buffer does not contain such structures I<$raw> can be omitted.
+
+I<$sp> describes the data in the raw buffer unless raw is omitted.
+Else it must be valid, with the following additional constraints:
+* videostd_set must contain one or more bits from the
+C<VBI_VIDEOSTD_SET_625_50>.
+* scanning must be 625 (libzvbi 0.2.x only)
+* sampling_format must be C<VBI_PIXFMT_Y8> or
+C<VBI_PIXFMT_YUV420>. Chrominance samples are ignored.
+* sampling_rate must be 13500000.
+* offset must be >= 132.
+* samples_per_line (in libzvbi 0.2.x bytes_per_line) must be >= 1.
+* offset + samples_per_line must be <= 132 + 720.
+* synchronous must be set.
+
+The function returns 0 on failures. For a description of failure
+conditions see I<cor()> above.
+
+=item $mx->get_data_identifier()
+
+Returns the data_identifier the multiplexer encodes into PES packets.
+
+=item $ok = $mx->set_data_identifier($data_identifier)
+
+This function can be used to determine the I<$data_identifier> byte
+to be stored in PES packets.
+For compatibility with decoders compliant to EN 300 472 this should
+be a value in the range 0x10 to 0x1F inclusive. The values 0x99
+to 0x9B inclusive as defined in EN 301 775 are also permitted.
+The default data_identifier is 0x10.
+
+Returns 0 if I<$data_identifier> is outside the valid range.
+
+=item $size = $mx->get_min_pes_packet_size()
+
+Returns the maximum size of PES packets the multiplexer generates.
+
+=item $size = $mx->get_max_pes_packet_size()
+
+Returns the minimum size of PES packets the multiplexer generates.
+
+=item $ok = $mx->set_pes_packet_size($min_size, $max_size)
+
+Determines the minimum and maximum total size of PES packets
+generated by the multiplexer, including all header bytes. When
+the data to be stored in a packet is smaller than the minimum size,
+the multiplexer will fill the packet up with stuffing bytes. When
+the data is larger than the maximum size the I<feed()> and
+I<cor()> functions will fail.
+
+The PES packet size must be a multiple of 184 bytes, in the range 184
+to 65504 bytes inclusive, and this function will round I<$min_size> up
+and I<$max_size> down accordingly. If after rounding the maximum size is
+lower than the minimum, it will be set to the same value as the
+minimum size.
+
+The default minimum size is 184, the default maximum 65504 bytes. For
+compatibility with decoders compliant to the Teletext buffer model
+defined in EN 300 472 the maximum should not exceed 1472 bytes.
+
+Returns 0 on failure (out of memory)
+
+=back
+
+The next functions provide similar functionality as described above, but
+are special as they work without a I<dvb_mux> object.
+Meaning and use of parameters is the same as described above.
+
+=over 4
+
+=item Video::ZVBI::dvb_multiplex_sliced($buf, $buffer_left, $sliced, $sliced_left, $service_mask, $data_identifier, $stuffing)
+
+Converts the sliced VBI data in the I<$sliced> buffer to VBI data
+units as defined in EN 300 472 and EN 301 775 and stores them
+in I<$buf> as output buffer.
+
+=item Video::ZVBI::dvb_multiplex_raw($buf, $buffer_left, $raw, $raw_left, $data_identifier, $videostd_set, $line, $first_pixel_position, $n_pixels_total, $stuffing)
+
+Converts one line of raw VBI samples in I<$raw> to one or more "monochrome
+4:2:2 samples" data units as defined in EN 301 775, and stores
+them in the I<$buf> output buffer.
+
+Parameters:
+I<$line> The ITU-R line number to be encoded in the data units.
+It must not change until all samples have been encoded.
+I<$first_pixel_position> The horizontal offset where decoders
+shall insert the first sample in the VBI, counting samples from
+the start of the digital active line as defined in ITU-R BT.601.
+Usually this value is zero and I<$n_pixels_total> is 720.
+I<$first_pixel_position> + I<$n_pixels_total> must not be greater
+than 720. This parameter must not change until all samples have
+been encoded.
+I<$n_pixels_total> Total size of the raw input buffer in bytes,
+and the total number of samples to be encoded. Initially this
+value must be equal to I<$raw_left>, and it must not change until
+all samples have been encoded.
+Remaining parameters are the same as described above.
+
+B<Note:>
+According to EN 301 775 all lines stored in one PES packet must
+belong to the same video frame (but the data of one frame may be
+transmitted in several successive PES packets). They must be encoded
+in the same order as they would be transmitted in the VBI, no line more
+than once. Samples may have to be split into multiple segments and they
+must be contiguously encoded into adjacent data units. The function
+cannot enforce this if multiple calls are necessary to encode all
+samples.
+
+=back
+
+
 =head1 Video::ZVBI::dvb_demux
 
 Separating VBI data from a DVB PES stream (EN 301 472, EN 301 775).
@@ -945,7 +1212,7 @@ i.e. data transmissions based on packet 8/30.
 Creates and returns a new Independent Data Line format A
 (EN 300 708 section 6.5) demultiplexer.
 
-I<$channel> filter out packets of this channel. 
+I<$channel> filter out packets of this channel.
 I<$address> filter out packets with this service data address.
 Optional: I<$callback> is a hanlder to be called by I<$idl-E<gt>feed()>
 when new data is available.  If present, I<$user_data> is passed through
@@ -1029,7 +1296,7 @@ B<Available:> since libzvbi version 0.2.26
 
 =head1 Video::ZVBI::xds_demux
 
-Separating XDS data from a Closed Caption stream (EIA 608). 
+Separating XDS data from a Closed Caption stream (EIA 608).
 
 =over 4
 
@@ -2439,6 +2706,12 @@ The script captures raw VBI data from a device and displays the data as
 an animated gray-scale image. One selected line is plotted and the decoded
 teletext or VPS Data of that line is shown.
 
+=item dvb-mux.pl
+
+This script is a small example for use of the DVD multiplexer functions
+(available since libzvbi 0.2.26)  The scripts captures teletext from an
+analog VBI device and generates a PES or TS stream on STDOUT.
+
 =back
 
 =head1 AUTHORS
@@ -2454,10 +2727,10 @@ See also L<http://zapping.sourceforge.net/>
 
 =head1 COPYING
 
-Copyright 2007 Tom Zoerner. All rights reserved.
+Copyright (C) 2007 Tom Zoerner.
 
 Parts of the descriptions in this man page are copied from the
-"libzvbi" library version 0.2.25, licensed under the GNU General Public
+"libzvbi" documentation, licensed under the GNU General Public
 License version 2 or later,
 Copyright (C) 2000-2007 Michael H. Schimek,
 Copyright (C) 2000-2001 Iñaki García Etxebarria,
