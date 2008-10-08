@@ -41,7 +41,8 @@ sub feed_cb {
 sub main_func {
    my $opt_device = "/dev/vbi0";
    my $opt_buf_count = 5;
-   my $opt_services = VBI_SLICED_TELETEXT_B;
+   my $opt_services = VBI_SLICED_TELETEXT_B_625;
+   #my $opt_services = VBI_SLICED_TELETEXT_A;
    my $opt_strict = 0;
    my $opt_verbose = 0;
    my $opt_use_feed = 0;
@@ -90,10 +91,10 @@ sub main_func {
          my $sliced_left = $n_lines;
 
          # pass sliced data to multiplexer
+         my $buf_size = 2048;
+         my $buf_left = $buf_size;
+         my $buf;
          while ($sliced_left > 0) {
-            my $buf_size = 2048;
-            my $buf_left = $buf_size;
-            my $buf;
             print STDERR "$timestamp $buf_left <- $n_lines+$sliced_left\n";
             if (!$mux->cor($buf, $buf_left, $sliced, $sliced_left, $opt_services, $timestamp*90000.0)) {
 
@@ -108,9 +109,9 @@ sub main_func {
                last if $sliced_left == 0;
             }
             #die if $buf_left == 0;  # buffer too small
-            syswrite STDOUT, $buf, $buf_size-$buf_left if defined $buf;
-            print STDERR "wrote ".($buf_size-$buf_left)."\n";
          }
+         syswrite STDOUT, $buf, $buf_size-$buf_left if defined $buf;
+         print STDERR "wrote ".($buf_size-$buf_left)."\n";
       } else {
 
          if (!$mux->feed($sliced, $n_lines, $opt_services, $timestamp*90000.0)) {

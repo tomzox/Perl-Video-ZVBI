@@ -54,9 +54,9 @@ sub search {
       my $last_page;
       my $last_sub;
 
-      my $rand = [int(rand(1000))];
-      print "Search rand user data $rand->[0]\n";
-      $srch = Video::ZVBI::search::new($vtdec, 0x100, $any_sub, $pat, 0, 0, \&progress, $rand);
+      #my $rand = [int(rand(1000))];
+      #print "Search rand user data $rand->[0]\n";
+      $srch = Video::ZVBI::search::new($vtdec, 0x100, $any_sub, $pat, 0, 0, \&progress);
       die "failed to initialize search: $!\n" unless $srch;
 
       while (($stat = $srch->next($pg, 1)) == VBI_SEARCH_SUCCESS) {

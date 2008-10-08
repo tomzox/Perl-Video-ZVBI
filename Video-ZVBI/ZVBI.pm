@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2007 Tom Zoerner.
+# Copyright (C) 2006-2008 Tom Zoerner.
 #
 # Man page descriptions are in part copied from libzvbi documentation:
 #
@@ -17,7 +17,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: ZVBI.pm,v 1.4 2007/12/02 19:51:52 tom Exp tom $
+# $Id: ZVBI.pm,v 1.5 2008/10/08 20:27:31 tom Exp tom $
 #
 
 package Video::ZVBI;
@@ -31,7 +31,7 @@ require Exporter;
 require DynaLoader;
 
 our @ISA = ('Exporter', 'DynaLoader');
-our $VERSION = "0.2.3";  # remember to update README and META.yml too
+our $VERSION = "0.2.4";  # remember to update README and META.yml too
 our @EXPORT = qw();
 our @EXPORT_OK = qw();  # filled by XSUB
 
@@ -2721,7 +2721,7 @@ starting March 2006 for the Teletext EPG grabber accompanying nxtvepg
 L<http://nxtvepg.sourceforge.net/>
 
 The module is based on the libzvbi library, mainly written and maintained
-by Michael H. Schimek (2000-2007) and Iñaki García Etxebarria (2000-2001),
+by Michael H. Schimek (2000-2007) and IE<ntilde>aki GarcE<iacute>a Etxebarria (2000-2001),
 which in turn is based on AleVT 1.5.1 by Edgar Toernig (1998-1999).
 See also L<http://zapping.sourceforge.net/>
 
@@ -2733,7 +2733,7 @@ Parts of the descriptions in this man page are copied from the
 "libzvbi" documentation, licensed under the GNU General Public
 License version 2 or later,
 Copyright (C) 2000-2007 Michael H. Schimek,
-Copyright (C) 2000-2001 Iñaki García Etxebarria,
+Copyright (C) 2000-2001 IE<ntilde>aki GarcE<iacute>a Etxebarria,
 Copyright (C) 2003-2004 Tom Zoerner.
 
 This program is free software: you can redistribute it and/or modify

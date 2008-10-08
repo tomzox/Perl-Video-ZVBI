@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2007 Tom Zoerner.
+ * Copyright (C) 2006-2008 Tom Zoerner.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -11,12 +11,18 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * $Id: ZVBI.xs,v 1.4 2007/12/02 21:00:18 tom Exp tom $
+ * $Id: ZVBI.xs,v 1.5 2008/10/08 20:37:06 tom Exp tom $
  */
 
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
+
+/* backwards compatibility with older versions of Perl via Devel::PPPort */
+#define NEED_newCONSTSUB
+#define NEED_newRV_noinc
+#define NEED_sv_2pv_nolen
+#include "ppport_zvbi.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -199,7 +205,7 @@ zvbi_xs_alloc_callback( zvbi_xs_cb_t * p_list, SV * p_cb, SV * p_data, void * p_
         return idx;
 }
 
-static unsigned
+static void
 zvbi_xs_free_callback_by_idx( zvbi_xs_cb_t * p_list, unsigned idx )
 {
         if (p_list[idx].p_cb != NULL) {
@@ -778,7 +784,6 @@ static void
 zvbi_xs_proxy_callback( void * user_data, VBI_PROXY_EV_TYPE ev_mask )
 {
         VbiProxyObj * ctx = user_data;
-        SV * perl_cb;
 
         if ((ctx != NULL) && (ctx->proxy_cb != NULL)) {
                 dSP ;
@@ -1568,6 +1573,8 @@ vbi_proxy_client_get_driver_api(vpc)
         VbiProxyObj * vpc
         CODE:
         RETVAL = vbi_proxy_client_get_driver_api(vpc->ctx);
+        OUTPUT:
+        RETVAL
 
 int
 vbi_proxy_client_channel_request(vpc, chn_prio, profile=NULL)
@@ -1605,6 +1612,8 @@ vbi_proxy_client_channel_notify(vpc, notify_flags, scanning=0)
         int scanning
         CODE:
         RETVAL = vbi_proxy_client_channel_notify(vpc->ctx, notify_flags, scanning);
+        OUTPUT:
+        RETVAL
 
 int
 vbi_proxy_client_channel_suspend(vpc, cmd)
@@ -1612,6 +1621,8 @@ vbi_proxy_client_channel_suspend(vpc, cmd)
         int cmd
         CODE:
         RETVAL = vbi_proxy_client_channel_suspend(vpc->ctx, cmd);
+        OUTPUT:
+        RETVAL
 
 int
 vbi_proxy_client_device_ioctl(vpc, request, sv_buf)
@@ -1649,6 +1660,8 @@ vbi_proxy_client_has_channel_control(vpc)
         VbiProxyObj * vpc
         CODE:
         RETVAL = vbi_proxy_client_has_channel_control(vpc->ctx);
+        OUTPUT:
+        RETVAL
 
 #endif
 
@@ -2295,9 +2308,13 @@ vbi_dvb_mux_cor(mx, sv_buf, buffer_left, sv_sliced, sliced_left, service_mask, p
                                              pts);
                 } else if (p_sliced != NULL) {
                         croak("Invalid sliced left count %d for buffer size (max. %d lines)", sliced_left, max_lines);
+                        RETVAL = FALSE;
+                } else {
+                        RETVAL = FALSE;
                 }
         } else {
                 croak("Output buffer size %d is less than left count %d", buf_size, buffer_left);
+                RETVAL = FALSE;
         }
         OUTPUT:
         buffer_left
@@ -2353,6 +2370,9 @@ vbi_dvb_mux_feed(mx, sv_sliced, sliced_lines, service_mask, pts, sv_raw=NULL, hv
                                       pts);
         } else if (p_sliced != NULL) {
                 croak("Invalid sliced line count %d for buffer size (max. %d lines)", sliced_lines, max_lines);
+                RETVAL = FALSE;
+        } else {
+                RETVAL = FALSE;
         }
         OUTPUT:
         RETVAL
@@ -2363,6 +2383,8 @@ vbi_dvb_mux_get_data_identifier(mx)
         CODE:
         CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_get_data_identifier);
         RETVAL = zvbi_(dvb_mux_get_data_identifier)(mx->ctx);
+        OUTPUT:
+        RETVAL
 
 vbi_bool
 vbi_dvb_mux_set_data_identifier(mx, data_identifier)
@@ -2371,6 +2393,8 @@ vbi_dvb_mux_set_data_identifier(mx, data_identifier)
         CODE:
         CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_set_data_identifier);
         RETVAL = zvbi_(dvb_mux_set_data_identifier)(mx->ctx, data_identifier);
+        OUTPUT:
+        RETVAL
 
 unsigned int
 vbi_dvb_mux_get_min_pes_packet_size(mx)
@@ -2378,6 +2402,8 @@ vbi_dvb_mux_get_min_pes_packet_size(mx)
         CODE:
         CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_get_min_pes_packet_size);
         RETVAL = zvbi_(dvb_mux_get_min_pes_packet_size)(mx->ctx);
+        OUTPUT:
+        RETVAL
 
 unsigned int
 vbi_dvb_mux_get_max_pes_packet_size(mx)
@@ -2385,6 +2411,8 @@ vbi_dvb_mux_get_max_pes_packet_size(mx)
         CODE:
         CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_get_max_pes_packet_size);
         RETVAL = zvbi_(dvb_mux_get_max_pes_packet_size)(mx->ctx);
+        OUTPUT:
+        RETVAL
 
 vbi_bool
 vbi_dvb_mux_set_pes_packet_size(mx, min_size, max_size)
@@ -2394,6 +2422,8 @@ vbi_dvb_mux_set_pes_packet_size(mx, min_size, max_size)
         CODE:
         CHECK_LIBZVBI_SYM(0,2,26, dvb_mux_set_pes_packet_size);
         RETVAL = zvbi_(dvb_mux_set_pes_packet_size)(mx->ctx, min_size, max_size);
+        OUTPUT:
+        RETVAL
 
 MODULE = Video::ZVBI	PACKAGE = Video::ZVBI
 
@@ -2411,7 +2441,6 @@ dvb_multiplex_sliced(sv_buf, buffer_left, sv_sliced, sliced_left, service_mask, 
         STRLEN                  buf_size;
         const vbi_sliced *      p_sliced;
         unsigned int            max_lines;
-        vbi_raw_decoder         rd;
         CODE:
         CHECK_LIBZVBI_SYM(0,2,26, dvb_multiplex_sliced);
         if (SvPOK(sv_buf)) {
@@ -2434,9 +2463,13 @@ dvb_multiplex_sliced(sv_buf, buffer_left, sv_sliced, sliced_left, service_mask, 
                                                         stuffing );
                 } else if (p_sliced != NULL) {
                         croak("Invalid sliced left count %d for buffer size (max. %d lines)", sliced_left, max_lines);
+                        RETVAL = FALSE;
+                } else {
+                        RETVAL = FALSE;
                 }
         } else {
                 croak("Output buffer size %d is less than left count %d", buf_size, buffer_left);
+                RETVAL = FALSE;
         }
         OUTPUT:
         buffer_left
@@ -2484,12 +2517,15 @@ dvb_multiplex_raw(sv_buf, buffer_left, sv_raw, raw_left, data_identifier, videos
                                                              n_pixels_total, stuffing);
                         } else {
                                 croak("Output buffer size %d is less than left count %d", buf_size, buffer_left);
+                                RETVAL = FALSE;
                         }
                 } else {
                         croak("Raw input buffer is undefined or not a scalar");
+                        RETVAL = FALSE;
                 }
         } else {
                 croak("Output buffer size %d is less than left count %d", buf_size, buffer_left);
+                RETVAL = FALSE;
         }
         OUTPUT:
         buffer_left
@@ -2642,25 +2678,25 @@ MODULE = Video::ZVBI	PACKAGE = Video::ZVBI::idl_demux	PREFIX = vbi_idl_demux_
 #if LIBZVBI_H_VERSION(0,2,14)
 
 VbiIdl_DemuxObj *
-new(channel, address, callback=NULL, user_data=NULL)
+new(channel, address, callback, user_data=NULL)
         unsigned int           channel
         unsigned int           address
         CV *                   callback
         SV *                   user_data
         CODE:
-        Newz(0, RETVAL, 1, VbiIdl_DemuxObj);
         if (callback != NULL) {
+                Newz(0, RETVAL, 1, VbiIdl_DemuxObj);
                 RETVAL->ctx = vbi_idl_a_demux_new(channel, address,
                                                   zvbi_xs_demux_idl_handler, RETVAL);
                 if (RETVAL->ctx != NULL) {
                         RETVAL->demux_cb = SvREFCNT_inc(callback);
                         RETVAL->demux_user_data = SvREFCNT_inc(user_data);
+                } else {
+                        Safefree(RETVAL);
+                        RETVAL = NULL;
                 }
         } else {
-                RETVAL->ctx = vbi_idl_a_demux_new(channel, address, NULL, NULL);
-        }
-        if (RETVAL->ctx == NULL) {
-                Safefree(RETVAL);
+                croak("Callback must be defined");
                 RETVAL = NULL;
         }
         OUTPUT:
@@ -2718,10 +2754,13 @@ vbi_idl_demux_feed_frame(dx, sv_sliced, n_lines)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
-                        zvbi_(idl_demux_feed_frame)(dx->ctx, p_sliced, n_lines);
+                        RETVAL = zvbi_(idl_demux_feed_frame)(dx->ctx, p_sliced, n_lines);
                 } else {
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
+                        RETVAL = FALSE;
                 }
+        } else {
+                RETVAL = FALSE;
         }
 #else
         CROAK_LIB_VERSION(0,2,26, idl_demux_feed_frame);
@@ -2740,14 +2779,14 @@ MODULE = Video::ZVBI	PACKAGE = Video::ZVBI::pfc_demux	PREFIX = vbi_pfc_demux_
 #if LIBZVBI_H_VERSION(0,2,14)
 
 VbiPfc_DemuxObj *
-vbi_pfc_demux_new(pgno, stream, callback=NULL, user_data=NULL)
+vbi_pfc_demux_new(pgno, stream, callback, user_data=NULL)
         vbi_pgno               pgno
         unsigned int           stream
         CV *                   callback
         SV *                   user_data
         CODE:
-        Newz(0, RETVAL, 1, VbiPfc_DemuxObj);
         if (callback != NULL) {
+                Newz(0, RETVAL, 1, VbiPfc_DemuxObj);
                 /* note: libzvbi prior to version 0.2.26 had an incorrect type definition
                  * for the callback, hence the compiler will warn about a type mismatch */
                 RETVAL->ctx = vbi_pfc_demux_new(pgno, stream, zvbi_xs_demux_pfc_handler, RETVAL);
@@ -2755,12 +2794,12 @@ vbi_pfc_demux_new(pgno, stream, callback=NULL, user_data=NULL)
                 if (RETVAL->ctx != NULL) {
                         RETVAL->demux_cb = SvREFCNT_inc(callback);
                         RETVAL->demux_user_data = SvREFCNT_inc(user_data);
+                } else {
+                        Safefree(RETVAL);
+                        RETVAL = NULL;
                 }
         } else {
-                RETVAL->ctx = vbi_pfc_demux_new(pgno, stream, NULL, NULL);
-        }
-        if (RETVAL->ctx == NULL) {
-                Safefree(RETVAL);
+                croak("Callback must be defined");
                 RETVAL = NULL;
         }
         OUTPUT:
@@ -2818,10 +2857,13 @@ vbi_pfc_demux_feed_frame(dx, sv_sliced, n_lines)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
-                        zvbi_(pfc_demux_feed_frame)(dx->ctx, p_sliced, n_lines);
+                        RETVAL = zvbi_(pfc_demux_feed_frame)(dx->ctx, p_sliced, n_lines);
                 } else {
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
+                        RETVAL = FALSE;
                 }
+        } else {
+                RETVAL = FALSE;
         }
 #else
         CROAK_LIB_VERSION(0,2,26, pfc_demux_feed_frame);
@@ -2840,23 +2882,23 @@ MODULE = Video::ZVBI	PACKAGE = Video::ZVBI::xds_demux	PREFIX = vbi_xds_demux_
 #if LIBZVBI_H_VERSION(0,2,16)
 
 VbiXds_DemuxObj *
-vbi_xds_demux_new(callback=NULL, user_data=NULL)
+vbi_xds_demux_new(callback, user_data=NULL)
         CV * callback
         SV * user_data
         CODE:
-        Newz(0, RETVAL, 1, VbiXds_DemuxObj);
         if (callback != NULL) {
+                Newz(0, RETVAL, 1, VbiXds_DemuxObj);
                 RETVAL->ctx = vbi_xds_demux_new(zvbi_xs_demux_xds_handler, RETVAL);
 
                 if (RETVAL->ctx != NULL) {
                         RETVAL->demux_cb = SvREFCNT_inc(callback);
                         RETVAL->demux_user_data = SvREFCNT_inc(user_data);
+                } else {
+                        Safefree(RETVAL);
+                        RETVAL = NULL;
                 }
         } else {
-                RETVAL->ctx = vbi_xds_demux_new(NULL, NULL);
-        }
-        if (RETVAL->ctx == NULL) {
-                Safefree(RETVAL);
+                croak("Callback must be defined");
                 RETVAL = NULL;
         }
         OUTPUT:
@@ -2914,10 +2956,13 @@ vbi_xds_demux_feed_frame(xd, sv_sliced, n_lines)
         p_sliced = zvbi_xs_sv_to_sliced(sv_sliced, &max_lines);
         if (p_sliced != NULL) {
                 if (n_lines <= max_lines) {
-                        zvbi_(xds_demux_feed_frame)(xd->ctx, p_sliced, n_lines);
+                        RETVAL = zvbi_(xds_demux_feed_frame)(xd->ctx, p_sliced, n_lines);
                 } else {
                         croak("Invalid line count %d for buffer size (max. %d lines)", n_lines, max_lines);
+                        RETVAL = FALSE;
                 }
+        } else {
+                RETVAL = FALSE;
         }
 #else
         CROAK_LIB_VERSION(0,2,26, xds_demux_feed_frame);
@@ -3783,7 +3828,9 @@ vbi_export_stdio(exp, fp, pg_obj)
         FILE * fp
         VbiPageObj * pg_obj
         CODE:
-        vbi_export_stdio(exp, fp, pg_obj->p_pg);
+        RETVAL = vbi_export_stdio(exp, fp, pg_obj->p_pg);
+        OUTPUT:
+        RETVAL
 
 vbi_bool
 vbi_export_file(exp, name, pg_obj)
@@ -3791,7 +3838,9 @@ vbi_export_file(exp, name, pg_obj)
         const char * name
         VbiPageObj * pg_obj
         CODE:
-        vbi_export_file(exp, name, pg_obj->p_pg);
+        RETVAL = vbi_export_file(exp, name, pg_obj->p_pg);
+        OUTPUT:
+        RETVAL
 
 int
 vbi_export_mem(exp, sv_buf, pg_obj)
@@ -3809,6 +3858,7 @@ vbi_export_mem(exp, sv_buf, pg_obj)
                 RETVAL = zvbi_(export_mem)(exp, p_buf, buf_size + 1, pg_obj->p_pg);
         } else {
                 croak("Input buffer is undefined or not a scalar");
+                RETVAL = FALSE;
         }
 #else
         CROAK_LIB_VERSION(0,2,26, export_mem);
@@ -3899,6 +3949,7 @@ vbi_search_new(vbi, pgno, subno, sv_pattern, casefold=0, regexp=0, progress=NULL
                         }
                 } else {
                         croak ("Max. search callback count exceeded");
+                        RETVAL = NULL;
                 }
         }
         Safefree(p_ucs);
