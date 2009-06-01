@@ -2,8 +2,8 @@ ZVBI library interface module
 -----------------------------
 
 Name:           Video-ZVBI
-Version:        0.2.4
-Date:           October 2008
+Version:        0.2.5
+Date:           June 2009
 
 DLSIP-code:     bcdOg
                 - development stage: beta testing
@@ -27,7 +27,7 @@ closed caption via analog video or DVB capture devices.
 Official ZVBI library description:
 
   "The ZVBI library provides routines to access raw VBI sampling devices
-  (currently the Linux V4L and and V4L2 API and the FreeBSD, OpenBSD,
+  (currently the Linux V4L & V4L2 APIs and the FreeBSD, OpenBSD,
   NetBSD and BSDi bktr driver API are supported), a versatile raw VBI
   bit slicer, decoders for various data services and basic search, render
   and export functions for text pages. The library was written for the

@@ -12,7 +12,7 @@ teletext or closed captions via analog or DVB video capture devices.
 Official ZVBI library description:
 
 > The ZVBI library provides routines to access raw VBI sampling devices
-> (currently the Linux V4L and and V4L2 API and the FreeBSD, OpenBSD,
+> (currently the Linux V4L &amp; V4L2 APIs and the FreeBSD, OpenBSD,
 > NetBSD and BSDi bktr driver API are supported), a versatile raw VBI
 > bit slicer, decoders for various data services and basic search, render
 > and export functions for text pages. The library was written for the
@@ -124,7 +124,7 @@ respectively.
 
 ## Copyright
 
-Copyright (C) 2006-2008 T. Zoerner.
+Copyright (C) 2006-2009 T. Zoerner.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

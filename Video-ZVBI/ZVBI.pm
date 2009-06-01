@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2008 Tom Zoerner.
+# Copyright (C) 2006-2009 Tom Zoerner.
 #
 # Man page descriptions are in part copied from libzvbi documentation:
 #
@@ -17,7 +17,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: ZVBI.pm,v 1.5 2008/10/08 20:27:31 tom Exp tom $
+# $Id: ZVBI.pm,v 1.6 2009/06/01 19:55:16 tom Exp tom $
 #
 
 package Video::ZVBI;
@@ -31,7 +31,7 @@ require Exporter;
 require DynaLoader;
 
 our @ISA = ('Exporter', 'DynaLoader');
-our $VERSION = "0.2.4";  # remember to update README and META.yml too
+our $VERSION = "0.2.5";  # remember to update README and META.yml too
 our @EXPORT = qw();
 our @EXPORT_OK = qw();  # filled by XSUB
 
@@ -60,7 +60,7 @@ closed caption via analog video or DVB capture devices.
 
 Official library description:
 "The ZVBI library provides routines to access raw VBI sampling devices
-(currently the Linux V4L and and V4L2 API and the FreeBSD, OpenBSD,
+(currently the Linux V4L & V4L2 APIs and the FreeBSD, OpenBSD,
 NetBSD and BSDi bktr driver API are supported), a versatile raw VBI
 bit slicer, decoders for various data services and basic search, render
 and export functions for text pages. The library was written for the

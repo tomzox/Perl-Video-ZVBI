@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2008 Tom Zoerner.
+# Copyright (C) 2006-2009 Tom Zoerner.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: Makefile.PL,v 1.4 2008/10/08 20:15:37 tom Exp tom $
+# $Id: Makefile.PL,v 1.5 2009/06/01 19:53:15 tom Exp tom $
 #
 
 # oldest supported perl version
@@ -58,7 +58,7 @@ if ($#$ll < 0) {
 my $def = "";
 my $lso;
 foreach $lso (@$ll) {
-        if ($lso =~ s#(zvbi.*)\.\d+\.0$#$1#) {
+        if ($lso =~ s#(zvbi.*)\.\d+(\.\d+){0,1}$#$1#) {
                 $def .= "-DLIBZVBI_PATH=\\\"$lso\\\"";
                 last;
         }
