@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2009 Tom Zoerner.
+# Copyright (C) 2006-2011 Tom Zoerner.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
 #
 # For a copy of the GPL refer to <http://www.gnu.org/licenses/>
 #
-# $Id: Makefile.PL,v 1.5 2009/06/01 19:53:15 tom Exp tom $
+# $Id: Makefile.PL,v 1.6 2011/01/02 16:42:18 tom Exp tom $
 #
 
 # oldest supported perl version
@@ -56,16 +56,22 @@ if ($#$ll < 0) {
 # module for dynamic loading
 #
 my $def = "";
-my $lso;
-foreach $lso (@$ll) {
-        if ($lso =~ s#(zvbi.*)\.\d+(\.\d+){0,1}$#$1#) {
-                $def .= "-DLIBZVBI_PATH=\\\"$lso\\\"";
+my $lso_path;
+foreach (@$ll) {
+        if (m#(^|/)(libzvbi\.so($|[^a-zA-Z].*))#) {
+                $lso_path = $_;
+                if (($lso_path =~ /(.*libzvbi\.so.\d+)/) && (-r $1)) {
+                        $lso_path = $1;
+                }
+                print STDERR "Library path for dlopen(): $lso_path\n";
                 last;
         }
 }
 
 # load optional symbols dynamically from shared library
-$def .= " -DUSE_DL_SYM";
+# this requires to pass the library path and file name to dlopen()
+die "\nFATAL: libzvbi.so not found in:\n".join(",",@$ll)."\n" unless defined $lso_path;
+$def .= " -DUSE_DL_SYM -DLIBZVBI_PATH=\\\"$lso_path\\\"";
 
 # use packaged header file instead of the one that may or may not be installed
 # should only be enabled together with USE_DL_SYM

@@ -2,8 +2,8 @@ ZVBI library interface module
 -----------------------------
 
 Name:           Video-ZVBI
-Version:        0.2.5
-Date:           June 2009
+Version:        0.2.6
+Date:           January 2011
 
 DLSIP-code:     bcdOg
                 - development stage: beta testing
@@ -119,7 +119,7 @@ version of libzvbi and which version of the Perl ZVBI module.
 Copyright
 ---------
 
-Copyright (C) 2006-2008 Th. "Tom" Zoerner.
+Copyright (C) 2006-2011 Th. "Tom" Zoerner.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

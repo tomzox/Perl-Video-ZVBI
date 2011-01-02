@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2009 Tom Zoerner.
+ * Copyright (C) 2006-2011 Tom Zoerner.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -11,7 +11,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * $Id: ZVBI.xs,v 1.6 2009/06/01 19:55:32 tom Exp tom $
+ * $Id: ZVBI.xs,v 1.7 2011/01/02 16:41:28 tom Exp tom $
  */
 
 #include "EXTERN.h"

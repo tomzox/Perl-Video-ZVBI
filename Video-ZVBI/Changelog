@@ -1,3 +1,11 @@
+libzvbi-perl (2.6) unstable; urgency=low
+
+  * Makefile.PL: Improved zvbi library path detection (again)
+  * ZVBI.pm: Spelling and format fixes in documentation
+  * ppport_zvbi.h: update to ppport.h version 3.19
+
+ -- Tom Zoerner <tomzo@users.sourceforge.net>  Sun, 02 Jan 2011 14:45:13 +0200
+
 libzvbi-perl (2.5) unstable; urgency=low
 
   * Makefile.PL: Improved zvbi library path detection
