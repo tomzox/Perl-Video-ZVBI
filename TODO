@@ -1,0 +1,11 @@
+- some callbacks are lacking object reference (DVB, IDL, XDS)
+
+- draw CC page region: img offset parameter
+
+- include helper functions for low-level packet TTX decoding
+  (preferrably include in libzvbi) some are already in libzvbi-0.3
+
+- doc: improve description of hash arrays: events etc.
+- doc: include constant lists
+
+ZVBI library: proxy_client_device_iotctl: buf size arg missing

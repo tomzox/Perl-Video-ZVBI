@@ -1,0 +1,923 @@
+#
+# Up to release 0.2.6, files were under RCS version control. These
+# individual commits were not imported into git due to high effort.
+# Commit history for all files is included in this file for future
+# reference; entries can be synced with git history using release
+# labels and dates.
+#
+
+RCS file: RCS/COPYING,v
+Working file: COPYING
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_5: 1.1
+	ZVBI_0_2_4: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:51;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/Changelog,v
+Working file: Changelog
+head: 1.7
+branch:
+locks: strict
+	tom: 1.7
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.7
+	ZVBI_0_2_6: 1.6
+	ZVBI_0_2_5: 1.5
+	ZVBI_0_2_4: 1.4
+	ZVBI_0_2_3: 1.3
+	ZVBI_0_2_2: 1.2
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 7;	selected revisions: 7
+description:
+----------------------------
+revision 1.7	locked by: tom;
+date: 2020/04/01 07:10:55;  author: tom;  state: Exp;  lines: +21 -14
+added change log for 1.0.0
+----------------------------
+revision 1.6
+date: 2011/01/02 16:40:23;  author: tom;  state: Exp;  lines: +8 -0
+added change log for 0.2.6
+----------------------------
+revision 1.5
+date: 2009/06/01 19:52:49;  author: tom;  state: Exp;  lines: +13 -5
+added change log for 0.2.5
+----------------------------
+revision 1.4
+date: 2008/10/08 20:38:33;  author: tom;  state: Exp;  lines: +51 -32
+- added changelog for version 0.2.4
+- formatted according to Debian lintian guidelines
+----------------------------
+revision 1.3
+date: 2007/12/02 21:10:01;  author: tom;  state: Exp;  lines: +15 -1
+added change log for 0.2.3
+----------------------------
+revision 1.2
+date: 2007/11/23 22:20:58;  author: tom;  state: Exp;  lines: +12 -0
+added change log for 0.2.2
+----------------------------
+revision 1.1
+date: 2007/11/19 21:10:51;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/MANIFEST,v
+Working file: MANIFEST
+head: 1.5
+branch:
+locks: strict
+	tom: 1.5
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.5
+	ZVBI_0_2_6: 1.5
+	ZVBI_0_2_5: 1.5
+	ZVBI_0_2_4: 1.5
+	ZVBI_0_2_3: 1.4
+	ZVBI_0_2_2: 1.3
+	ZVBI_0_2_1: 1.2
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 5;	selected revisions: 5
+description:
+----------------------------
+revision 1.5	locked by: tom;
+date: 2008/10/08 20:06:46;  author: tom;  state: Exp;  lines: +5 -1
+- added new ppport_zvbi.h
+- added missing (older) files; name change "Changelog"
+----------------------------
+revision 1.4
+date: 2007/11/27 21:46:01;  author: tom;  state: Exp;  lines: +1 -1
+Corrected name of Meta.yml into META.yml
+----------------------------
+revision 1.3
+date: 2007/11/21 20:49:13;  author: tom;  state: Exp;  lines: +1 -0
+Added Meta.yml
+----------------------------
+revision 1.2
+date: 2007/11/19 21:10:59;  author: tom;  state: Exp;  lines: +1 -0
+Added ChangeLog
+----------------------------
+revision 1.1
+date: 2007/11/18 18:48:51;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/META.yml,v
+Working file: META.yml
+head: 1.6
+branch:
+locks: strict
+	tom: 1.6
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.6
+	ZVBI_0_2_6: 1.5
+	ZVBI_0_2_5: 1.4
+	ZVBI_0_2_4: 1.3
+	ZVBI_0_2_3: 1.2
+	ZVBI_0_2_2: 1.1
+keyword substitution: kv
+total revisions: 6;	selected revisions: 6
+description:
+----------------------------
+revision 1.6	locked by: tom;
+date: 2020/04/01 07:11:30;  author: tom;  state: Exp;  lines: +3 -3
+changed version to 1.0.0 & updated homepage URL
+----------------------------
+revision 1.5
+date: 2011/01/02 16:40:36;  author: tom;  state: Exp;  lines: +1 -1
+changed version to 0.2.6
+----------------------------
+revision 1.4
+date: 2009/06/01 19:52:59;  author: tom;  state: Exp;  lines: +1 -1
+changed version to 0.2.5
+----------------------------
+revision 1.3
+date: 2008/10/08 20:08:20;  author: tom;  state: Exp;  lines: +1 -1
+changed version to 0.2.4
+----------------------------
+revision 1.2
+date: 2007/12/02 15:37:11;  author: tom;  state: Exp;  lines: +4 -2
+- syntax fix
+- added Tk as recommended
+- changed version to 0.2.3
+----------------------------
+revision 1.1
+date: 2007/11/23 21:55:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/Makefile.PL,v
+Working file: Makefile.PL
+head: 1.6
+branch:
+locks: strict
+	tom: 1.6
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.6
+	ZVBI_0_2_6: 1.6
+	ZVBI_0_2_5: 1.5
+	ZVBI_0_2_4: 1.4
+	ZVBI_0_2_3: 1.3
+	ZVBI_0_2_2: 1.2
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 6;	selected revisions: 6
+description:
+----------------------------
+revision 1.6	locked by: tom;
+date: 2011/01/02 16:42:18;  author: tom;  state: Exp;  lines: +13 -7
+Made LIBZVBI_PATH detection mandatory & more flexible
+----------------------------
+revision 1.5
+date: 2009/06/01 19:53:15;  author: tom;  state: Exp;  lines: +3 -3
+Bugfix pattern match on zvbi library file name
+- previous match failed with Ubuntu 9.04
+----------------------------
+revision 1.4
+date: 2008/10/08 20:15:37;  author: tom;  state: Exp;  lines: +13 -5
+added work-around for libthreads dependency for FreeBSD
+- suggested by Slaven Rezic from the CPAN testers team 2007-12-05 via email
+----------------------------
+revision 1.3
+date: 2007/12/02 19:47:24;  author: tom;  state: Exp;  lines: +13 -5
+- made perl version requirement backwards compatible with perl <= 5.6
+- call exit(0) instead of die when zvbi library is not found
+  to avoid FAIL reports by CPAN testers
+----------------------------
+revision 1.2
+date: 2007/11/23 22:20:19;  author: tom;  state: Exp;  lines: +47 -4
+- abort if zvbi library is not found
+- added compile options USE_DL_SYM and USE_LIBZVBI_INT for ZVBI.xs
+- require Perl 5.7.1 because of UTF-8 support
+----------------------------
+revision 1.1
+date: 2007/11/18 18:48:51;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/README,v
+Working file: README
+head: 1.8
+branch:
+locks: strict
+	tom: 1.8
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.8
+	ZVBI_0_2_6: 1.7
+	ZVBI_0_2_5: 1.6
+	ZVBI_0_2_4: 1.5
+	ZVBI_0_2_3: 1.4
+	ZVBI_0_2_2: 1.3
+	ZVBI_0_2_1: 1.2
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 8;	selected revisions: 8
+description:
+----------------------------
+revision 1.8	locked by: tom;
+date: 2020/04/01 07:15:25;  author: tom;  state: Exp;  lines: +34 -38
+changed version to 1.0.0, removed "Beta Warning", updated URLs,
+improved description & referred to github homepage
+----------------------------
+revision 1.7
+date: 2011/01/02 16:40:55;  author: tom;  state: Exp;  lines: +3 -3
+changed version to 0.2.6, extended copyright to 2011
+----------------------------
+revision 1.6
+date: 2009/06/01 19:54:15;  author: tom;  state: Exp;  lines: +3 -3
+- changed version to 0.2.5
+- remove duplicate "and" in description (found by lintian)
+----------------------------
+revision 1.5
+date: 2008/10/08 20:39:02;  author: tom;  state: Exp;  lines: +3 -3
+changed version to 0.2.4
+----------------------------
+revision 1.4
+date: 2007/12/02 19:50:18;  author: tom;  state: Exp;  lines: +9 -7
+- incremented version number to 0.2.3
+- noted compatibility with libzvbi 0.2.4 when disabling USE_DL_SYM
+----------------------------
+revision 1.3
+date: 2007/11/23 22:20:30;  author: tom;  state: Exp;  lines: +10 -5
+- incremented version number to 0.2.2
+- removed requirement for libzvbi-dev (i.e. for libzvbi.h)
+  added note about dynamic load of lib symbols instead
+----------------------------
+revision 1.2
+date: 2007/11/19 21:40:48;  author: tom;  state: Exp;  lines: +1 -1
+Incremented version number to 0.2.1
+----------------------------
+revision 1.1
+date: 2007/11/18 18:48:51;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/TODO,v
+Working file: TODO
+head: 1.3
+branch:
+locks: strict
+	tom: 1.3
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.3
+	ZVBI_0_2_6: 1.2
+	ZVBI_0_2_5: 1.2
+	ZVBI_0_2_4: 1.2
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+----------------------------
+revision 1.3	locked by: tom;
+date: 2020/04/01 07:16:07;  author: tom;  state: Exp;  lines: +0 -2
+white-space only
+----------------------------
+revision 1.2
+date: 2008/10/08 20:40:01;  author: tom;  state: Exp;  lines: +2 -0
+added note about proxy_client_device_iotctl
+----------------------------
+revision 1.1
+date: 2007/11/18 19:33:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/ZVBI.pm,v
+Working file: ZVBI.pm
+head: 1.8
+branch:
+locks: strict
+	tom: 1.8
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.8
+	ZVBI_0_2_6: 1.7
+	ZVBI_0_2_5: 1.6
+	ZVBI_0_2_4: 1.5
+	ZVBI_0_2_3: 1.4
+	ZVBI_0_2_2: 1.3
+	ZVBI_0_2_1: 1.2
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 8;	selected revisions: 8
+description:
+----------------------------
+revision 1.8	locked by: tom;
+date: 2020/04/01 07:16:37;  author: tom;  state: Exp;  lines: +5 -5
+changed version to 1.0.0
+----------------------------
+revision 1.7
+date: 2011/01/02 14:02:44;  author: tom;  state: Exp;  lines: +76 -51
+- spelling and minor format fixes (including bug ##51873)
+- set version to 0.2.6 and copyright from 2009 to 2011
+----------------------------
+revision 1.6
+date: 2009/06/01 19:55:16;  author: tom;  state: Exp;  lines: +4 -4
+- changed version to 0.2.5
+- remove duplicate "and" in description (found by lintian)
+----------------------------
+revision 1.5
+date: 2008/10/08 20:27:31;  author: tom;  state: Exp;  lines: +5 -5
+- changed version to 0.2.4
+- replaced "ñ" with E<ntilde> in copyright to avoid lintian warning
+----------------------------
+revision 1.4
+date: 2007/12/02 19:51:52;  author: tom;  state: Exp;  lines: +283 -10
+- incremented version number to 0.2.3
+- made perl version requirement backwards compatible with perl <= 5.6
+- added documentation for new dvb_mux module
+----------------------------
+revision 1.3
+date: 2007/11/23 22:20:46;  author: tom;  state: Exp;  lines: +4 -2
+- require Perl 5.7.1 because of UTF-8 support
+- incremented version number to 0.2.2
+----------------------------
+revision 1.2
+date: 2007/11/19 21:42:08;  author: tom;  state: Exp;  lines: +5 -3
+- event_handler_remove(): arg "handler" is no longer optional
+- Incremented version number to 0.2.1
+----------------------------
+revision 1.1
+date: 2007/11/18 19:33:38;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/ZVBI.xs,v
+Working file: ZVBI.xs
+head: 1.8
+branch:
+locks: strict
+	tom: 1.8
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.8
+	ZVBI_0_2_6: 1.7
+	ZVBI_0_2_5: 1.6
+	ZVBI_0_2_4: 1.5
+	ZVBI_0_2_3: 1.4
+	ZVBI_0_2_2: 1.3
+	ZVBI_0_2_1: 1.2
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 8;	selected revisions: 8
+description:
+----------------------------
+revision 1.8	locked by: tom;
+date: 2020/04/01 07:17:11;  author: tom;  state: Exp;  lines: +5 -3
+replaced use of deprecated utf8_to_uvchr() with utf8_to_uvchr_buf(),
+which has an additional param "p_utf_end" to prevent reading past
+the end of the input string
+----------------------------
+revision 1.7
+date: 2011/01/02 16:41:28;  author: tom;  state: Exp;  lines: +2 -2
+updated copyright to 2011
+----------------------------
+revision 1.6
+date: 2009/06/01 19:55:32;  author: tom;  state: Exp;  lines: +38 -35
+- Fixed compiler warnings with Perl 5.10
+- update to ppport.h version 3.13
+----------------------------
+revision 1.5
+date: 2008/10/08 20:37:06;  author: tom;  state: Exp;  lines: +79 -28
+- added include of ppport.h, generated by Devel::PPPort() of Perl 5.8.8
+- made callback function ptr arg non-optional for idl, pfc and xds demux
+- fixed compiler warnings & XSUB usage errors (missing OUTPUT:REVAL)
+----------------------------
+revision 1.4
+date: 2007/12/02 21:00:18;  author: tom;  state: Exp;  lines: +599 -63
+- implemented interface to new DVB multiplexer in zvbi-0.2.26
+- fixed lib version checks for compilation without -DUSE_DL_SYM
+- extended compatibility down to libzvbi 0.2.4 for compilation
+  against external libzvbi.h
+----------------------------
+revision 1.3
+date: 2007/11/23 22:24:39;  author: tom;  state: Exp;  lines: +208 -63
+- inlude libzvbi_int.h instead to avoid dep. on libzvbi-dev (USE_LIBZVBI_INT)
+- load symbols of recent library versions dynamically (USE_DL_SYM)
+- inserted some more missing PREINITs
+----------------------------
+revision 1.2
+date: 2007/11/19 21:15:00;  author: tom;  state: Exp;  lines: +39 -9
+- syntax fixes
+- perl 5.6 and 5.005 compatibility (missing dMY_CXT, UTF8_MAXBYTES)
+- bugfix search progress callback function pointer array
+- event_handler_remove(): arg "handler" is no longer optional
+----------------------------
+revision 1.1
+date: 2007/11/18 19:34:14;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/create_deb.sh,v
+Working file: create_deb.sh
+head: 1.4
+branch:
+locks: strict
+	tom: 1.4
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.4
+	ZVBI_0_2_6: 1.3
+	ZVBI_0_2_5: 1.2
+	ZVBI_0_2_4: 1.1
+keyword substitution: kv
+total revisions: 4;	selected revisions: 4
+description:
+Script to generate Debian binary package
+----------------------------
+revision 1.4	locked by: tom;
+date: 2020/04/01 07:19:28;  author: tom;  state: Exp;  lines: +53 -51
+- renamed file from mkdebian to create_deb.sh
+- converted from Perl to Bash script
+- use "gzip -n" to avoid lintian warning
+- updated package description text
+- added progress output via echo
+- changed version to 1.0.0
+----------------------------
+revision 1.3
+date: 2011/01/02 16:41:41;  author: tom;  state: Exp;  lines: +3 -3
+changed version to 0.2.6, extended copyright to 2011
+----------------------------
+revision 1.2
+date: 2009/06/01 19:58:44;  author: tom;  state: Exp;  lines: +13 -11
+Bugfix path to library in perl5 tree (detected by lintian)
+----------------------------
+revision 1.1
+date: 2008/10/08 20:33:36;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/libzvbi_int.h,v
+Working file: libzvbi_int.h
+head: 1.3
+branch:
+locks: strict
+	tom: 1.3
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.3
+	ZVBI_0_2_6: 1.2
+	ZVBI_0_2_5: 1.2
+	ZVBI_0_2_4: 1.2
+	ZVBI_0_2_3: 1.2
+	ZVBI_0_2_2: 1.1
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+----------------------------
+revision 1.3	locked by: tom;
+date: 2020/04/01 07:22:34;  author: tom;  state: Exp;  lines: +2 -2
+fixed compiler warning: replaced "#if #cpu (i686)" construct
+----------------------------
+revision 1.2
+date: 2007/11/28 20:45:36;  author: tom;  state: Exp;  lines: +106 -68
+Upgrade to libzvbi.h from release 0.2.26
+----------------------------
+revision 1.1
+date: 2007/11/23 21:55:14;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/ppport_zvbi.h,v
+Working file: ppport_zvbi.h
+head: 1.4
+branch:
+locks: strict
+	tom: 1.4
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.4
+	ZVBI_0_2_6: 1.3
+	ZVBI_0_2_5: 1.2
+	ZVBI_0_2_4: 1.1
+keyword substitution: kv
+total revisions: 4;	selected revisions: 4
+description:
+ppport.h as generated by Devel::PPPort
+Initial version generated by Perl 5.8.8
+----------------------------
+revision 1.4	locked by: tom;
+date: 2020/04/01 07:18:45;  author: tom;  state: Exp;  lines: +1410 -565
+update to ppport.h version 3.35
+----------------------------
+revision 1.3
+date: 2011/01/02 14:10:31;  author: tom;  state: Exp;  lines: +840 -153
+update to ppport.h version 3.19
+----------------------------
+revision 1.2
+date: 2009/06/01 19:59:01;  author: tom;  state: Exp;  lines: +4895 -278
+update to ppport.h version 3.13
+----------------------------
+revision 1.1
+date: 2008/10/08 20:31:17;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/test.pl,v
+Working file: test.pl
+head: 1.2
+branch:
+locks: strict
+	tom: 1.2
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.2
+	ZVBI_0_2_6: 1.2
+	ZVBI_0_2_5: 1.2
+	ZVBI_0_2_4: 1.2
+	ZVBI_0_2_3: 1.2
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2	locked by: tom;
+date: 2007/12/02 18:43:53;  author: tom;  state: Exp;  lines: +5 -2
+Added print-out of library version number
+----------------------------
+revision 1.1
+date: 2007/11/18 18:48:51;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/typemap,v
+Working file: typemap
+head: 1.2
+branch:
+locks: strict
+	tom: 1.2
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.2
+	ZVBI_0_2_6: 1.2
+	ZVBI_0_2_5: 1.2
+	ZVBI_0_2_4: 1.2
+	ZVBI_0_2_3: 1.2
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2	locked by: tom;
+date: 2007/12/02 18:43:08;  author: tom;  state: Exp;  lines: +5 -2
+Added new types for dvb_mux sub-module
+----------------------------
+revision 1.1
+date: 2007/11/18 18:48:51;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/browse-ttx.pl,v
+Working file: browse-ttx.pl
+head: 1.2
+branch:
+locks: strict
+	tom: 1.2
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.2
+	ZVBI_0_2_6: 1.2
+	ZVBI_0_2_3: 1.2
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2	locked by: tom;
+date: 2007/12/02 18:30:50;  author: tom;  state: Exp;  lines: +23 -16
+Switched back to use draw_vt_page() instead of export in XPM format
+- for backwards compatibility with older libraries
+----------------------------
+revision 1.1
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/caption.pl,v
+Working file: caption.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/capture.pl,v
+Working file: capture.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/decode.pl,v
+Working file: decode.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/dvb-mux.pl,v
+Working file: dvb-mux.pl
+head: 1.2
+branch:
+locks: strict
+	tom: 1.2
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.2
+	ZVBI_0_2_6: 1.2
+	ZVBI_0_2_3: 1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2	locked by: tom;
+date: 2020/04/01 07:31:19;  author: tom;  state: Exp;  lines: +8 -7
+Late commit of changes done 2007-12-03
+- done one day after release 0.2.3, thus included only in 0.2.4 onward
+- apparently replaced VBI_SLICED_TELETEXT_B with VBI_SLICED_TELETEXT_B_625
+----------------------------
+revision 1.1
+date: 2007/12/02 18:42:17;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/explist.pl,v
+Working file: explist.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/export.pl,v
+Working file: export.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/hamm.pl,v
+Working file: hamm.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/network.pl,v
+Working file: network.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/osc.pl,v
+Working file: osc.pl
+head: 1.2
+branch:
+locks: strict
+	tom: 1.2
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.2
+	ZVBI_0_2_6: 1.2
+	ZVBI_0_2_3: 1.2
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2	locked by: tom;
+date: 2007/12/02 18:31:10;  author: tom;  state: Exp;  lines: +5 -3
+Minor improvements of key bindings:
+- trigger redraw after resize and up/down in case capturing is frozen
+----------------------------
+revision 1.1
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/proxy-test.pl,v
+Working file: proxy-test.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/search-ttx.pl,v
+Working file: search-ttx.pl
+head: 1.3
+branch:
+locks: strict
+	tom: 1.3
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.3
+	ZVBI_0_2_6: 1.3
+	ZVBI_0_2_3: 1.2
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+----------------------------
+revision 1.3	locked by: tom;
+date: 2020/04/01 07:34:29;  author: tom;  state: Exp;  lines: +4 -4
+Late commit of changes done 2008-Aug-10 (included in release 0.2.4)
+- apparently removed random param value to Video::ZVBI::search::new()
+----------------------------
+revision 1.2
+date: 2007/12/02 18:32:11;  author: tom;  state: Exp;  lines: +10 -2
+implemented work-around for bug in proxy_new in libzvbi up to <= 0.2.26
+- save & resotre STDIN around call to proxy_new()
+- up to 0.2.26 proxy_new() will close(0) upon connect failure
+----------------------------
+revision 1.1
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: RCS/test-vps.pl,v
+Working file: test-vps.pl
+head: 1.1
+branch:
+locks: strict
+	tom: 1.1
+access list:
+symbolic names:
+	ZVBI_1_0_0: 1.1
+	ZVBI_0_2_6: 1.1
+	ZVBI_0_2_3: 1.1
+	ZVBI_0_2_2: 1.1
+	ZVBI_0_2_1: 1.1
+	ZVBI_0_2_0: 1.1
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1	locked by: tom;
+date: 2007/11/18 18:48:35;  author: tom;  state: Exp;
+Initial revision
+=============================================================================
